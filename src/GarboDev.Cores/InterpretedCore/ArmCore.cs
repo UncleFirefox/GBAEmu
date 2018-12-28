@@ -42,11 +42,11 @@ namespace GarboDev.Cores.InterpretedCore
         private const uint OP_MVN = 0xF;
 
         private delegate void ExecuteInstruction();
-        private ExecuteInstruction[] NormalOps = null;
+        private readonly ExecuteInstruction[] NormalOps;
 
-        private Arm7Processor parent;
-        private Memory memory;
-        private uint[] registers;
+        private readonly Arm7Processor parent;
+        private readonly Memory memory;
+        private readonly uint[] registers;
 
         private uint instructionQueue;
         private uint curInstruction;
@@ -61,36 +61,36 @@ namespace GarboDev.Cores.InterpretedCore
         {
             this.parent = parent;
             this.memory = memory;
-            this.registers = this.parent.Registers;
+            registers = this.parent.Registers;
 
-            this.NormalOps = new ExecuteInstruction[8]
+            NormalOps = new ExecuteInstruction[8]
                 {
-                    this.DataProcessing,
-                    this.DataProcessingImmed,
-                    this.LoadStoreImmediate,
-                    this.LoadStoreRegister,
-                    this.LoadStoreMultiple,
-                    this.Branch,
-                    this.CoprocessorLoadStore,
-                    this.SoftwareInterrupt
+                    DataProcessing,
+                    DataProcessingImmed,
+                    LoadStoreImmediate,
+                    LoadStoreRegister,
+                    LoadStoreMultiple,
+                    Branch,
+                    CoprocessorLoadStore,
+                    SoftwareInterrupt
                 };
         }
 
         public void BeginExecution()
         {
-            this.FlushQueue();
+            FlushQueue();
         }
 
         public void Step()
         {
-            this.UnpackFlags();
+            UnpackFlags();
 
-            this.curInstruction = this.instructionQueue;
-            this.instructionQueue = this.memory.ReadU32(registers[15]);
+            curInstruction = instructionQueue;
+            instructionQueue = memory.ReadU32(registers[15]);
             registers[15] += 4;
 
             uint cond = 0;
-            switch (this.curInstruction >> 28)
+            switch (curInstruction >> 28)
             {
                 case COND_AL: cond = 1; break;
                 case COND_EQ: cond = zero; break;
@@ -112,38 +112,38 @@ namespace GarboDev.Cores.InterpretedCore
             if (cond == 1)
             {
                 // Execute the instruction
-                this.NormalOps[(curInstruction >> 25) & 0x7]();
+                NormalOps[(curInstruction >> 25) & 0x7]();
             }
 
-            this.parent.Cycles -= this.memory.WaitCycles;
+            parent.Cycles -= memory.WaitCycles;
 
-            if ((this.parent.CPSR & Arm7Processor.T_MASK) == Arm7Processor.T_MASK)
+            if ((parent.CPSR & Arm7Processor.T_MASK) == Arm7Processor.T_MASK)
             {
-                this.parent.ReloadQueue();
+                parent.ReloadQueue();
             }
 
-            this.PackFlags();
+            PackFlags();
         }
 
         public void Execute()
         {
-            this.UnpackFlags();
-            this.thumbMode = false;
+            UnpackFlags();
+            thumbMode = false;
 
-            while (this.parent.Cycles > 0)
+            while (parent.Cycles > 0)
             {
-                this.curInstruction = this.instructionQueue;
-                this.instructionQueue = this.memory.ReadU32Aligned(registers[15]);
+                curInstruction = instructionQueue;
+                instructionQueue = memory.ReadU32Aligned(registers[15]);
                 registers[15] += 4;
 
-                if ((this.curInstruction >> 28) == COND_AL)
+                if ((curInstruction >> 28) == COND_AL)
                 {
-                    this.NormalOps[(curInstruction >> 25) & 0x7]();
+                    NormalOps[(curInstruction >> 25) & 0x7]();
                 }
                 else
                 {
                     uint cond = 0;
-                    switch (this.curInstruction >> 28)
+                    switch (curInstruction >> 28)
                     {
                         case COND_EQ: cond = zero; break;
                         case COND_NE: cond = 1 - zero; break;
@@ -164,15 +164,15 @@ namespace GarboDev.Cores.InterpretedCore
                     if (cond == 1)
                     {
                         // Execute the instruction
-                        this.NormalOps[(curInstruction >> 25) & 0x7]();
+                        NormalOps[(curInstruction >> 25) & 0x7]();
                     }
                 }
 
-                this.parent.Cycles -= this.memory.WaitCycles;
+                parent.Cycles -= memory.WaitCycles;
 
-                if (this.thumbMode)
+                if (thumbMode)
                 {
-                    this.parent.ReloadQueue();
+                    parent.ReloadQueue();
                     break;
                 }
 
@@ -186,7 +186,7 @@ namespace GarboDev.Cores.InterpretedCore
 #endif
             }
 
-            this.PackFlags();
+            PackFlags();
         }
 
         #region Barrel Shifter
@@ -197,16 +197,16 @@ namespace GarboDev.Cores.InterpretedCore
 
         private uint BarrelShifter(uint shifterOperand)
         {
-            uint type = (shifterOperand >> 5) & 0x3;
+            var type = (shifterOperand >> 5) & 0x3;
 
-            bool registerShift = (shifterOperand & (1 << 4)) == (1 << 4);
+            var registerShift = (shifterOperand & (1 << 4)) == (1 << 4);
 
-            uint rm = registers[shifterOperand & 0xF];
+            var rm = registers[shifterOperand & 0xF];
 
             int amount;
             if (registerShift)
             {
-                uint rs = (shifterOperand >> 8) & 0xF;
+                var rs = (shifterOperand >> 8) & 0xF;
                 if (rs == 15)
                 {
                     amount = (int)((registers[rs] + 0x4) & 0xFF);
@@ -230,7 +230,7 @@ namespace GarboDev.Cores.InterpretedCore
             {
                 if (amount == 0)
                 {
-                    this.shifterCarry = this.carry;
+                    shifterCarry = carry;
                     return rm;
                 }
 
@@ -239,34 +239,34 @@ namespace GarboDev.Cores.InterpretedCore
                     case SHIFT_LSL:
                         if (amount < 32)
                         {
-                            this.shifterCarry = (rm >> (32 - amount)) & 1;
+                            shifterCarry = (rm >> (32 - amount)) & 1;
                             return rm << amount;
                         }
                         else if (amount == 32)
                         {
-                            this.shifterCarry = rm & 1;
+                            shifterCarry = rm & 1;
                             return 0;
                         }
                         else
                         {
-                            this.shifterCarry = 0;
+                            shifterCarry = 0;
                             return 0;
                         }
 
                     case SHIFT_LSR:
                         if (amount < 32)
                         {
-                            this.shifterCarry = (rm >> (amount - 1)) & 1;
+                            shifterCarry = (rm >> (amount - 1)) & 1;
                             return rm >> amount;
                         }
                         else if (amount == 32)
                         {
-                            this.shifterCarry = (rm >> 31) & 1;
+                            shifterCarry = (rm >> 31) & 1;
                             return 0;
                         }
                         else
                         {
-                            this.shifterCarry = 0;
+                            shifterCarry = 0;
                             return 0;
                         }
 
@@ -275,31 +275,31 @@ namespace GarboDev.Cores.InterpretedCore
                         {
                             if ((rm & (1 << 31)) == 0)
                             {
-                                this.shifterCarry = 0;
+                                shifterCarry = 0;
                                 return 0;
                             }
                             else
                             {
-                                this.shifterCarry = 1;
+                                shifterCarry = 1;
                                 return 0xFFFFFFFF;
                             }
                         }
                         else
                         {
-                            this.shifterCarry = (rm >> (amount - 1)) & 1;
+                            shifterCarry = (rm >> (amount - 1)) & 1;
                             return (uint)(((int)rm) >> amount);
                         }
 
                     case SHIFT_ROR:
                         if ((amount & 0x1F) == 0)
                         {
-                            this.shifterCarry = (rm >> 31) & 1;
+                            shifterCarry = (rm >> 31) & 1;
                             return rm;
                         }
                         else
                         {
                             amount &= 0x1F;
-                            this.shifterCarry = (rm >> amount) & 1;
+                            shifterCarry = (rm >> amount) & 1;
                             return (rm >> amount) | (rm << (32 - amount));
                         }
                 }
@@ -311,24 +311,24 @@ namespace GarboDev.Cores.InterpretedCore
                     case SHIFT_LSL:
                         if (amount == 0)
                         {
-                            this.shifterCarry = this.carry;
+                            shifterCarry = carry;
                             return rm;
                         }
                         else
                         {
-                            this.shifterCarry = (rm >> (32 - amount)) & 1;
+                            shifterCarry = (rm >> (32 - amount)) & 1;
                             return rm << amount;
                         }
 
                     case SHIFT_LSR:
                         if (amount == 0)
                         {
-                            this.shifterCarry = (rm >> 31) & 1;
+                            shifterCarry = (rm >> 31) & 1;
                             return 0;
                         }
                         else
                         {
-                            this.shifterCarry = (rm >> (amount - 1)) & 1;
+                            shifterCarry = (rm >> (amount - 1)) & 1;
                             return rm >> amount;
                         }
 
@@ -337,18 +337,18 @@ namespace GarboDev.Cores.InterpretedCore
                         {
                             if ((rm & (1 << 31)) == 0)
                             {
-                                this.shifterCarry = 0;
+                                shifterCarry = 0;
                                 return 0;
                             }
                             else
                             {
-                                this.shifterCarry = 1;
+                                shifterCarry = 1;
                                 return 0xFFFFFFFF;
                             }
                         }
                         else
                         {
-                            this.shifterCarry = (rm >> (amount - 1)) & 1;
+                            shifterCarry = (rm >> (amount - 1)) & 1;
                             return (uint)(((int)rm) >> amount);
                         }
 
@@ -356,12 +356,12 @@ namespace GarboDev.Cores.InterpretedCore
                         if (amount == 0)
                         {
                             // Actually an RRX
-                            this.shifterCarry = rm & 1;
-                            return (this.carry << 31) | (rm >> 1);
+                            shifterCarry = rm & 1;
+                            return (carry << 31) | (rm >> 1);
                         }
                         else
                         {
-                            this.shifterCarry = (rm >> (amount - 1)) & 1;
+                            shifterCarry = (rm >> (amount - 1)) & 1;
                             return (rm >> amount) | (rm << (32 - amount));
                         }
                 }
@@ -389,12 +389,12 @@ namespace GarboDev.Cores.InterpretedCore
         #region Opcodes
         private void DoDataProcessing(uint shifterOperand)
         {
-            uint rn = (this.curInstruction >> 16) & 0xF;
-            uint rd = (this.curInstruction >> 12) & 0xF;
+            var rn = (curInstruction >> 16) & 0xF;
+            var rd = (curInstruction >> 12) & 0xF;
             uint alu;
 
-            bool registerShift = (this.curInstruction & (1 << 4)) == (1 << 4);
-            if (rn == 15 && ((this.curInstruction >> 25) & 0x7) == 0 && registerShift)
+            var registerShift = (curInstruction & (1 << 4)) == (1 << 4);
+            if (rn == 15 && ((curInstruction >> 25) & 0x7) == 0 && registerShift)
             {
                 rn = registers[rn] + 4;
             }
@@ -403,9 +403,9 @@ namespace GarboDev.Cores.InterpretedCore
                 rn = registers[rn];
             }
 
-            uint opcode = (this.curInstruction >> 21) & 0xF;
+            var opcode = (curInstruction >> 21) & 0xF;
 
-            if (((this.curInstruction >> 20) & 1) == 1)
+            if (((curInstruction >> 20) & 1) == 1)
             {
                 // Set flag bit set
                 switch (opcode)
@@ -415,7 +415,7 @@ namespace GarboDev.Cores.InterpretedCore
 
                         negative = registers[rd] >> 31;
                         zero = registers[rd] == 0 ? 1U : 0U;
-                        this.OverflowCarryAdd(rn, shifterOperand, registers[rd]);
+                        OverflowCarryAdd(rn, shifterOperand, registers[rd]);
                         break;
 
                     case OP_ADD:
@@ -423,7 +423,7 @@ namespace GarboDev.Cores.InterpretedCore
 
                         negative = registers[rd] >> 31;
                         zero = registers[rd] == 0 ? 1U : 0U;
-                        this.OverflowCarryAdd(rn, shifterOperand, registers[rd]);
+                        OverflowCarryAdd(rn, shifterOperand, registers[rd]);
                         break;
 
                     case OP_AND:
@@ -431,7 +431,7 @@ namespace GarboDev.Cores.InterpretedCore
 
                         negative = registers[rd] >> 31;
                         zero = registers[rd] == 0 ? 1U : 0U;
-                        carry = this.shifterCarry;
+                        carry = shifterCarry;
                         break;
 
                     case OP_BIC:
@@ -439,7 +439,7 @@ namespace GarboDev.Cores.InterpretedCore
 
                         negative = registers[rd] >> 31;
                         zero = registers[rd] == 0 ? 1U : 0U;
-                        carry = this.shifterCarry;
+                        carry = shifterCarry;
                         break;
 
                     case OP_CMN:
@@ -447,7 +447,7 @@ namespace GarboDev.Cores.InterpretedCore
 
                         negative = alu >> 31;
                         zero = alu == 0 ? 1U : 0U;
-                        this.OverflowCarryAdd(rn, shifterOperand, alu);
+                        OverflowCarryAdd(rn, shifterOperand, alu);
                         break;
 
                     case OP_CMP:
@@ -455,7 +455,7 @@ namespace GarboDev.Cores.InterpretedCore
 
                         negative = alu >> 31;
                         zero = alu == 0 ? 1U : 0U;
-                        this.OverflowCarrySub(rn, shifterOperand, alu);
+                        OverflowCarrySub(rn, shifterOperand, alu);
                         break;
 
                     case OP_EOR:
@@ -463,7 +463,7 @@ namespace GarboDev.Cores.InterpretedCore
 
                         negative = registers[rd] >> 31;
                         zero = registers[rd] == 0 ? 1U : 0U;
-                        carry = this.shifterCarry;
+                        carry = shifterCarry;
                         break;
 
                     case OP_MOV:
@@ -471,7 +471,7 @@ namespace GarboDev.Cores.InterpretedCore
 
                         negative = registers[rd] >> 31;
                         zero = registers[rd] == 0 ? 1U : 0U;
-                        carry = this.shifterCarry;
+                        carry = shifterCarry;
                         break;
 
                     case OP_MVN:
@@ -479,7 +479,7 @@ namespace GarboDev.Cores.InterpretedCore
 
                         negative = registers[rd] >> 31;
                         zero = registers[rd] == 0 ? 1U : 0U;
-                        carry = this.shifterCarry;
+                        carry = shifterCarry;
                         break;
 
                     case OP_ORR:
@@ -487,7 +487,7 @@ namespace GarboDev.Cores.InterpretedCore
 
                         negative = registers[rd] >> 31;
                         zero = registers[rd] == 0 ? 1U : 0U;
-                        carry = this.shifterCarry;
+                        carry = shifterCarry;
                         break;
 
                     case OP_RSB:
@@ -495,7 +495,7 @@ namespace GarboDev.Cores.InterpretedCore
 
                         negative = registers[rd] >> 31;
                         zero = registers[rd] == 0 ? 1U : 0U;
-                        this.OverflowCarrySub(shifterOperand, rn, registers[rd]);
+                        OverflowCarrySub(shifterOperand, rn, registers[rd]);
                         break;
 
                     case OP_RSC:
@@ -503,7 +503,7 @@ namespace GarboDev.Cores.InterpretedCore
 
                         negative = registers[rd] >> 31;
                         zero = registers[rd] == 0 ? 1U : 0U;
-                        this.OverflowCarrySub(shifterOperand, rn, registers[rd]);
+                        OverflowCarrySub(shifterOperand, rn, registers[rd]);
                         break;
 
                     case OP_SBC:
@@ -511,7 +511,7 @@ namespace GarboDev.Cores.InterpretedCore
 
                         negative = registers[rd] >> 31;
                         zero = registers[rd] == 0 ? 1U : 0U;
-                        this.OverflowCarrySub(rn, shifterOperand, registers[rd]);
+                        OverflowCarrySub(rn, shifterOperand, registers[rd]);
                         break;
 
                     case OP_SUB:
@@ -519,7 +519,7 @@ namespace GarboDev.Cores.InterpretedCore
 
                         negative = registers[rd] >> 31;
                         zero = registers[rd] == 0 ? 1U : 0U;
-                        this.OverflowCarrySub(rn, shifterOperand, registers[rd]);
+                        OverflowCarrySub(rn, shifterOperand, registers[rd]);
                         break;
 
                     case OP_TEQ:
@@ -527,7 +527,7 @@ namespace GarboDev.Cores.InterpretedCore
 
                         negative = alu >> 31;
                         zero = alu == 0 ? 1U : 0U;
-                        carry = this.shifterCarry;
+                        carry = shifterCarry;
                         break;
 
                     case OP_TST:
@@ -535,25 +535,25 @@ namespace GarboDev.Cores.InterpretedCore
 
                         negative = alu >> 31;
                         zero = alu == 0 ? 1U : 0U;
-                        carry = this.shifterCarry;
+                        carry = shifterCarry;
                         break;
                 }
 
                 if (rd == 15)
                 {
                     // Prevent writing if no SPSR exists (this will be true for USER or SYSTEM mode)
-                    if (this.parent.SPSRExists) this.parent.WriteCpsr(this.parent.SPSR);
-                    this.UnpackFlags();
+                    if (parent.SPSRExists) parent.WriteCpsr(parent.SPSR);
+                    UnpackFlags();
 
                     // Check for branch back to Thumb Mode
-                    if ((this.parent.CPSR & Arm7Processor.T_MASK) == Arm7Processor.T_MASK)
+                    if ((parent.CPSR & Arm7Processor.T_MASK) == Arm7Processor.T_MASK)
                     {
-                        this.thumbMode = true;
+                        thumbMode = true;
                         return;
                     }
 
                     // Otherwise, flush the instruction queue
-                    this.FlushQueue();
+                    FlushQueue();
                 }
             }
             else
@@ -576,25 +576,25 @@ namespace GarboDev.Cores.InterpretedCore
 
                     case OP_CMN:
                         // MSR SPSR, shifterOperand
-                        if ((this.curInstruction & (1 << 16)) == 1 << 16 && this.parent.SPSRExists)
+                        if ((curInstruction & (1 << 16)) == 1 << 16 && parent.SPSRExists)
                         {
-                            this.parent.SPSR &= 0xFFFFFF00;
-                            this.parent.SPSR |= shifterOperand & 0x000000FF;
+                            parent.SPSR &= 0xFFFFFF00;
+                            parent.SPSR |= shifterOperand & 0x000000FF;
                         }
-                        if ((this.curInstruction & (1 << 17)) == 1 << 17 && this.parent.SPSRExists)
+                        if ((curInstruction & (1 << 17)) == 1 << 17 && parent.SPSRExists)
                         {
-                            this.parent.SPSR &= 0xFFFF00FF;
-                            this.parent.SPSR |= shifterOperand & 0x0000FF00;
+                            parent.SPSR &= 0xFFFF00FF;
+                            parent.SPSR |= shifterOperand & 0x0000FF00;
                         }
-                        if ((this.curInstruction & (1 << 18)) == 1 << 18 && this.parent.SPSRExists)
+                        if ((curInstruction & (1 << 18)) == 1 << 18 && parent.SPSRExists)
                         {
-                            this.parent.SPSR &= 0xFF00FFFF;
-                            this.parent.SPSR |= shifterOperand & 0x00FF0000;
+                            parent.SPSR &= 0xFF00FFFF;
+                            parent.SPSR |= shifterOperand & 0x00FF0000;
                         }
-                        if ((this.curInstruction & (1 << 19)) == 1 << 19 && this.parent.SPSRExists)
+                        if ((curInstruction & (1 << 19)) == 1 << 19 && parent.SPSRExists)
                         {
-                            this.parent.SPSR &= 0x00FFFFFF;
-                            this.parent.SPSR |= shifterOperand & 0xFF000000;
+                            parent.SPSR &= 0x00FFFFFF;
+                            parent.SPSR |= shifterOperand & 0xFF000000;
                         }
 
                         // Queue will be flushed since rd == 15, so adjust the PC
@@ -603,71 +603,71 @@ namespace GarboDev.Cores.InterpretedCore
 
                     case OP_CMP:
                         // MRS rd, SPSR
-                        if (this.parent.SPSRExists) registers[rd] = this.parent.SPSR;
+                        if (parent.SPSRExists) registers[rd] = parent.SPSR;
                         break;
 
                     case OP_TEQ:
-                        if (((this.curInstruction >> 4) & 0xf) == 1)
+                        if (((curInstruction >> 4) & 0xf) == 1)
                         {
                             // BX
-                            uint rm = this.curInstruction & 0xf;
+                            var rm = curInstruction & 0xf;
 
-                            this.PackFlags();
+                            PackFlags();
 
-                            this.parent.CPSR &= ~Arm7Processor.T_MASK;
-                            this.parent.CPSR |= (registers[rm] & 1) << Arm7Processor.T_BIT;
+                            parent.CPSR &= ~Arm7Processor.T_MASK;
+                            parent.CPSR |= (registers[rm] & 1) << Arm7Processor.T_BIT;
 
                             registers[15] = registers[rm] & (~1U);
 
-                            this.UnpackFlags();
+                            UnpackFlags();
 
                             // Check for branch back to Thumb Mode
-                            if ((this.parent.CPSR & Arm7Processor.T_MASK) == Arm7Processor.T_MASK)
+                            if ((parent.CPSR & Arm7Processor.T_MASK) == Arm7Processor.T_MASK)
                             {
-                                this.thumbMode = true;
+                                thumbMode = true;
                                 return;
                             }
 
                             // Queue will be flushed later because rd == 15
                         }
-                        else if (((this.curInstruction >> 4) & 0xf) == 0)
+                        else if (((curInstruction >> 4) & 0xf) == 0)
                         {
                             // MSR CPSR, shifterOperand
-                            bool userMode = (this.parent.CPSR & 0x1F) == Arm7Processor.USR;
+                            var userMode = (parent.CPSR & 0x1F) == Arm7Processor.USR;
 
-                            this.PackFlags();
+                            PackFlags();
 
-                            uint tmpCPSR = this.parent.CPSR;
+                            var tmpCPSR = parent.CPSR;
 
-                            if ((this.curInstruction & (1 << 16)) == 1 << 16 && !userMode)
+                            if ((curInstruction & (1 << 16)) == 1 << 16 && !userMode)
                             {
                                 tmpCPSR &= 0xFFFFFF00;
                                 tmpCPSR |= shifterOperand & 0x000000FF;
                             }
-                            if ((this.curInstruction & (1 << 17)) == 1 << 17 && !userMode)
+                            if ((curInstruction & (1 << 17)) == 1 << 17 && !userMode)
                             {
                                 tmpCPSR &= 0xFFFF00FF;
                                 tmpCPSR |= shifterOperand & 0x0000FF00;
                             }
-                            if ((this.curInstruction & (1 << 18)) == 1 << 18 && !userMode)
+                            if ((curInstruction & (1 << 18)) == 1 << 18 && !userMode)
                             {
                                 tmpCPSR &= 0xFF00FFFF;
                                 tmpCPSR |= shifterOperand & 0x00FF0000;
                             }
-                            if ((this.curInstruction & (1 << 19)) == 1 << 19)
+                            if ((curInstruction & (1 << 19)) == 1 << 19)
                             {
                                 tmpCPSR &= 0x00FFFFFF;
                                 tmpCPSR |= shifterOperand & 0xFF000000;
                             }
 
-                            this.parent.WriteCpsr(tmpCPSR);
+                            parent.WriteCpsr(tmpCPSR);
 
-                            this.UnpackFlags();
+                            UnpackFlags();
 
                             // Check for branch back to Thumb Mode
-                            if ((this.parent.CPSR & Arm7Processor.T_MASK) == Arm7Processor.T_MASK)
+                            if ((parent.CPSR & Arm7Processor.T_MASK) == Arm7Processor.T_MASK)
                             {
-                                this.thumbMode = true;
+                                thumbMode = true;
                                 return;
                             }
 
@@ -678,15 +678,15 @@ namespace GarboDev.Cores.InterpretedCore
 
                     case OP_TST:
                         // MRS rd, CPSR
-                        this.PackFlags();
-                        registers[rd] = this.parent.CPSR;
+                        PackFlags();
+                        registers[rd] = parent.CPSR;
                         break;
                 }
 
                 if (rd == 15)
                 {
                     // Flush the queue
-                    this.FlushQueue();
+                    FlushQueue();
                 }
             }
         }
@@ -694,61 +694,61 @@ namespace GarboDev.Cores.InterpretedCore
         private void DataProcessing()
         {
             // Special instruction
-            switch ((this.curInstruction >> 4) & 0xF)
+            switch ((curInstruction >> 4) & 0xF)
             {
                 case 0x9:
                     // Multiply or swap instructions
-                    this.MultiplyOrSwap();
+                    MultiplyOrSwap();
                     return;
                 case 0xB:
                     // Load/Store Unsigned halfword
-                    this.LoadStoreHalfword();
+                    LoadStoreHalfword();
                     return;
                 case 0xD:
                     // Load/Store Signed byte
-                    this.LoadStoreHalfword();
+                    LoadStoreHalfword();
                     return;
                 case 0xF:
                     // Load/Store Signed halfword
-                    this.LoadStoreHalfword();
+                    LoadStoreHalfword();
                     return;
             }
 
-            this.DoDataProcessing(this.BarrelShifter(this.curInstruction));
+            DoDataProcessing(BarrelShifter(curInstruction));
         }
 
         private void DataProcessingImmed()
         {
-            uint immed = this.curInstruction & 0xFF;
-            int rotateAmount = (int)(((this.curInstruction >> 8) & 0xF) * 2);
+            var immed = curInstruction & 0xFF;
+            var rotateAmount = (int)(((curInstruction >> 8) & 0xF) * 2);
 
             immed = (immed >> rotateAmount) | (immed << (32 - rotateAmount));
 
             if (rotateAmount == 0)
             {
-                this.shifterCarry = this.carry;
+                shifterCarry = carry;
             }
             else
             {
-                this.shifterCarry = (immed >> 31) & 1;
+                shifterCarry = (immed >> 31) & 1;
             }
 
-            this.DoDataProcessing(immed);
+            DoDataProcessing(immed);
         }
 
         private void LoadStore(uint offset)
         {
-            uint rn = (this.curInstruction >> 16) & 0xF;
-            uint rd = (this.curInstruction >> 12) & 0xF;
+            var rn = (curInstruction >> 16) & 0xF;
+            var rd = (curInstruction >> 12) & 0xF;
 
-            uint address = registers[rn];
+            var address = registers[rn];
 
-            bool preIndexed = (this.curInstruction & (1 << 24)) == 1 << 24;
-            bool byteTransfer = (this.curInstruction & (1 << 22)) == 1 << 22;
-            bool writeback = (this.curInstruction & (1 << 21)) == 1 << 21;
+            var preIndexed = (curInstruction & (1 << 24)) == 1 << 24;
+            var byteTransfer = (curInstruction & (1 << 22)) == 1 << 22;
+            var writeback = (curInstruction & (1 << 21)) == 1 << 21;
 
             // Add or subtract offset
-            if ((this.curInstruction & (1 << 23)) != 1 << 23) offset = (uint)-offset;
+            if ((curInstruction & (1 << 23)) != 1 << 23) offset = (uint)-offset;
 
             if (preIndexed)
             {
@@ -760,16 +760,16 @@ namespace GarboDev.Cores.InterpretedCore
                 }
             }
 
-            if ((this.curInstruction & (1 << 20)) == 1 << 20)
+            if ((curInstruction & (1 << 20)) == 1 << 20)
             {
                 // Load
                 if (byteTransfer)
                 {
-                    registers[rd] = this.memory.ReadU8(address);
+                    registers[rd] = memory.ReadU8(address);
                 }
                 else
                 {
-                    registers[rd] = this.memory.ReadU32(address);
+                    registers[rd] = memory.ReadU32(address);
                 }
 
                 // ARM9 fix here
@@ -777,7 +777,7 @@ namespace GarboDev.Cores.InterpretedCore
                 if (rd == 15)
                 {
                     registers[rd] &= ~3U;
-                    this.FlushQueue();
+                    FlushQueue();
                 }
 
                 if (!preIndexed)
@@ -789,16 +789,16 @@ namespace GarboDev.Cores.InterpretedCore
             else
             {
                 // Store
-                uint amount = registers[rd];
+                var amount = registers[rd];
                 if (rd == 15) amount += 4;
 
                 if (byteTransfer)
                 {
-                    this.memory.WriteU8(address, (byte)(amount & 0xFF));
+                    memory.WriteU8(address, (byte)(amount & 0xFF));
                 }
                 else
                 {
-                    this.memory.WriteU32(address, amount);
+                    memory.WriteU32(address, amount);
                 }
 
                 if (!preIndexed)
@@ -810,44 +810,44 @@ namespace GarboDev.Cores.InterpretedCore
 
         private void LoadStoreImmediate()
         {
-            this.LoadStore(this.curInstruction & 0xFFF);
+            LoadStore(curInstruction & 0xFFF);
         }
 
         private void LoadStoreRegister()
         {
             // The barrel shifter expects a 0 in bit 4 for immediate shifts, this is implicit in
             // the meaning of the instruction, so it is fine
-            this.LoadStore(this.BarrelShifter(this.curInstruction));
+            LoadStore(BarrelShifter(curInstruction));
         }
 
         private void LoadStoreMultiple()
         {
-            uint rn = (this.curInstruction >> 16) & 0xF;
+            var rn = (curInstruction >> 16) & 0xF;
 
-            this.PackFlags();
-            uint curCpsr = this.parent.CPSR;
+            PackFlags();
+            var curCpsr = parent.CPSR;
 
-            bool preIncrement = (this.curInstruction & (1 << 24)) != 0;
-            bool up = (this.curInstruction & (1 << 23)) != 0;
-            bool writeback = (this.curInstruction & (1 << 21)) != 0;
+            var preIncrement = (curInstruction & (1 << 24)) != 0;
+            var up = (curInstruction & (1 << 23)) != 0;
+            var writeback = (curInstruction & (1 << 21)) != 0;
 
             uint address;
             uint bitsSet = 0;
-            for (int i = 0; i < 16; i++) if (((this.curInstruction >> i) & 1) != 0) bitsSet++;
+            for (var i = 0; i < 16; i++) if (((curInstruction >> i) & 1) != 0) bitsSet++;
 
             if (preIncrement)
             {
                 if (up)
                 {
                     // Increment before
-                    address = this.registers[rn] + 4;
-                    if (writeback) this.registers[rn] += bitsSet * 4;
+                    address = registers[rn] + 4;
+                    if (writeback) registers[rn] += bitsSet * 4;
                 }
                 else
                 {
                     // Decrement before
-                    address = this.registers[rn] - (bitsSet * 4);
-                    if (writeback) this.registers[rn] -= bitsSet * 4;
+                    address = registers[rn] - (bitsSet * 4);
+                    if (writeback) registers[rn] -= bitsSet * 4;
                 }
             }
             else
@@ -855,71 +855,71 @@ namespace GarboDev.Cores.InterpretedCore
                 if (up)
                 {
                     // Increment after
-                    address = this.registers[rn];
-                    if (writeback) this.registers[rn] += bitsSet * 4;
+                    address = registers[rn];
+                    if (writeback) registers[rn] += bitsSet * 4;
                 }
                 else
                 {
                     // Decrement after
-                    address = this.registers[rn] - (bitsSet * 4) + 4;
-                    if (writeback) this.registers[rn] -= bitsSet * 4;
+                    address = registers[rn] - (bitsSet * 4) + 4;
+                    if (writeback) registers[rn] -= bitsSet * 4;
                 }
             }
 
-            if ((this.curInstruction & (1 << 20)) != 0)
+            if ((curInstruction & (1 << 20)) != 0)
             {
-                if ((this.curInstruction & (1 << 22)) != 0 && ((this.curInstruction >> 15) & 1) == 0)
+                if ((curInstruction & (1 << 22)) != 0 && ((curInstruction >> 15) & 1) == 0)
                 {
                     // Switch to user mode temporarily
-                    this.parent.WriteCpsr((curCpsr & ~0x1FU) | Arm7Processor.USR);
+                    parent.WriteCpsr((curCpsr & ~0x1FU) | Arm7Processor.USR);
                 }
 
                 // Load multiple
-                for (int i = 0; i < 15; i++)
+                for (var i = 0; i < 15; i++)
                 {
-                    if (((this.curInstruction >> i) & 1) != 1) continue;
-                    this.registers[i] = this.memory.ReadU32Aligned(address & (~0x3U));
+                    if (((curInstruction >> i) & 1) != 1) continue;
+                    registers[i] = memory.ReadU32Aligned(address & (~0x3U));
                     address += 4;
                 }
 
-                if (((this.curInstruction >> 15) & 1) == 1)
+                if (((curInstruction >> 15) & 1) == 1)
                 {
                     // Arm9 fix here
 
-                    this.registers[15] = this.memory.ReadU32Aligned(address & (~0x3U));
+                    registers[15] = memory.ReadU32Aligned(address & (~0x3U));
 
-                    if ((this.curInstruction & (1 << 22)) != 0)
+                    if ((curInstruction & (1 << 22)) != 0)
                     {
                         // Load the CPSR from the SPSR
-                        if (this.parent.SPSRExists)
+                        if (parent.SPSRExists)
                         {
-                            this.parent.WriteCpsr(this.parent.SPSR);
-                            this.UnpackFlags();
+                            parent.WriteCpsr(parent.SPSR);
+                            UnpackFlags();
 
                             // Check for branch back to Thumb Mode
-                            if ((this.parent.CPSR & Arm7Processor.T_MASK) == Arm7Processor.T_MASK)
+                            if ((parent.CPSR & Arm7Processor.T_MASK) == Arm7Processor.T_MASK)
                             {
-                                this.thumbMode = true;
-                                this.registers[15] &= ~0x1U;
+                                thumbMode = true;
+                                registers[15] &= ~0x1U;
                                 return;
                             }
                         }
                     }
 
-                    this.registers[15] &= ~0x3U;
-                    this.FlushQueue();
+                    registers[15] &= ~0x3U;
+                    FlushQueue();
                 }
                 else
                 {
-                    if ((this.curInstruction & (1 << 22)) != 0)
+                    if ((curInstruction & (1 << 22)) != 0)
                     {
                         // Switch back to the correct mode
-                        this.parent.WriteCpsr(curCpsr);
-                        this.UnpackFlags();
+                        parent.WriteCpsr(curCpsr);
+                        UnpackFlags();
 
-                        if ((this.parent.CPSR & Arm7Processor.T_MASK) == Arm7Processor.T_MASK)
+                        if ((parent.CPSR & Arm7Processor.T_MASK) == Arm7Processor.T_MASK)
                         {
-                            this.thumbMode = true;
+                            thumbMode = true;
                             return;
                         }
                     }
@@ -927,14 +927,14 @@ namespace GarboDev.Cores.InterpretedCore
             }
             else
             {
-                if ((this.curInstruction & (1 << 22)) != 0)
+                if ((curInstruction & (1 << 22)) != 0)
                 {
                     // Switch to user mode temporarily
-                    this.parent.WriteCpsr((curCpsr & ~0x1FU) | Arm7Processor.USR);
+                    parent.WriteCpsr((curCpsr & ~0x1FU) | Arm7Processor.USR);
                 }
 
-                if (((this.curInstruction >> (int)rn) & 1) != 0 && writeback &&
-                    (this.curInstruction & ~(0xFFFFFFFF << (int)rn)) == 0)
+                if (((curInstruction >> (int)rn) & 1) != 0 && writeback &&
+                    (curInstruction & ~(0xFFFFFFFF << (int)rn)) == 0)
                 {
                     // If the lowest register is also the writeback, we use the original value
                     // Does anybody do this????
@@ -943,41 +943,41 @@ namespace GarboDev.Cores.InterpretedCore
                 else
                 {
                     // Store multiple
-                    for (int i = 0; i < 15; i++)
+                    for (var i = 0; i < 15; i++)
                     {
-                        if (((this.curInstruction >> i) & 1) == 0) continue;
-                        this.memory.WriteU32(address, this.registers[i]);
+                        if (((curInstruction >> i) & 1) == 0) continue;
+                        memory.WriteU32(address, registers[i]);
                         address += 4;
                     }
 
-                    if (((this.curInstruction >> 15) & 1) != 0)
+                    if (((curInstruction >> 15) & 1) != 0)
                     {
-                        this.memory.WriteU32(address, this.registers[15] + 4U);
+                        memory.WriteU32(address, registers[15] + 4U);
                     }
                 }
 
-                if ((this.curInstruction & (1 << 22)) != 0)
+                if ((curInstruction & (1 << 22)) != 0)
                 {
                     // Switch back to the correct mode
-                    this.parent.WriteCpsr(curCpsr);
-                    this.UnpackFlags();
+                    parent.WriteCpsr(curCpsr);
+                    UnpackFlags();
                 }
             }
         }
 
         private void Branch()
         {
-            if ((this.curInstruction & (1 << 24)) != 0)
+            if ((curInstruction & (1 << 24)) != 0)
             {
-                this.registers[14] = (this.registers[15] - 4U) & ~3U;
+                registers[14] = (registers[15] - 4U) & ~3U;
             }
 
-            uint branchOffset = this.curInstruction & 0x00FFFFFF;
+            var branchOffset = curInstruction & 0x00FFFFFF;
             if (branchOffset >> 23 == 1) branchOffset |= 0xFF000000;
 
-            this.registers[15] += branchOffset << 2;
+            registers[15] += branchOffset << 2;
 
-            this.FlushQueue();
+            FlushQueue();
         }
 
         private void CoprocessorLoadStore()
@@ -988,49 +988,49 @@ namespace GarboDev.Cores.InterpretedCore
         private void SoftwareInterrupt()
         {
             // Adjust PC for prefetch
-            this.registers[15] -= 4U;
-            this.parent.EnterException(Arm7Processor.SVC, 0x8, false, false);
+            registers[15] -= 4U;
+            parent.EnterException(Arm7Processor.SVC, 0x8, false, false);
         }
 
         private void MultiplyOrSwap()
         {
-            if ((this.curInstruction & (1 << 24)) == 1 << 24)
+            if ((curInstruction & (1 << 24)) == 1 << 24)
             {
                 // Swap instruction
-                uint rn = (this.curInstruction >> 16) & 0xF;
-                uint rd = (this.curInstruction >> 12) & 0xF;
-                uint rm = this.curInstruction & 0xF;
+                var rn = (curInstruction >> 16) & 0xF;
+                var rd = (curInstruction >> 12) & 0xF;
+                var rm = curInstruction & 0xF;
 
-                if ((this.curInstruction & (1 << 22)) != 0)
+                if ((curInstruction & (1 << 22)) != 0)
                 {
                     // SWPB
-                    byte tmp = this.memory.ReadU8(registers[rn]);
-                    this.memory.WriteU8(registers[rn], (byte)(registers[rm] & 0xFF));
+                    var tmp = memory.ReadU8(registers[rn]);
+                    memory.WriteU8(registers[rn], (byte)(registers[rm] & 0xFF));
                     registers[rd] = tmp;
                 }
                 else
                 {
                     // SWP
-                    uint tmp = this.memory.ReadU32(registers[rn]);
-                    this.memory.WriteU32(registers[rn], registers[rm]);
+                    var tmp = memory.ReadU32(registers[rn]);
+                    memory.WriteU32(registers[rn], registers[rm]);
                     registers[rd] = tmp;
                 }
             }
             else
             {
                 // Multiply instruction
-                switch ((this.curInstruction >> 21) & 0x7)
+                switch ((curInstruction >> 21) & 0x7)
                 {
                     case 0:
                     case 1:
                         {
                             // Multiply/Multiply + Accumulate
-                            uint rd = (this.curInstruction >> 16) & 0xF;
-                            uint rn = registers[(this.curInstruction >> 12) & 0xF];
-                            uint rs = (this.curInstruction >> 8) & 0xF;
-                            uint rm = this.curInstruction & 0xF;
+                            var rd = (curInstruction >> 16) & 0xF;
+                            var rn = registers[(curInstruction >> 12) & 0xF];
+                            var rs = (curInstruction >> 8) & 0xF;
+                            var rm = curInstruction & 0xF;
 
-                            int cycles = 4;
+                            var cycles = 4;
                             // Multiply cycle calculations
                             if ((registers[rs] & 0xFFFFFF00) == 0 || (registers[rs] & 0xFFFFFF00) == 0xFFFFFF00)
                             {
@@ -1046,15 +1046,15 @@ namespace GarboDev.Cores.InterpretedCore
                             }
 
                             registers[rd] = registers[rs] * registers[rm];
-                            this.parent.Cycles -= cycles;
+                            parent.Cycles -= cycles;
 
-                            if ((this.curInstruction & (1 << 21)) == 1 << 21)
+                            if ((curInstruction & (1 << 21)) == 1 << 21)
                             {
                                 registers[rd] += rn;
-                                this.parent.Cycles -= 1;
+                                parent.Cycles -= 1;
                             }
 
-                            if ((this.curInstruction & (1 << 20)) == 1 << 20)
+                            if ((curInstruction & (1 << 20)) == 1 << 20)
                             {
                                 negative = registers[rd] >> 31;
                                 zero = registers[rd] == 0 ? 1U : 0U;
@@ -1072,12 +1072,12 @@ namespace GarboDev.Cores.InterpretedCore
                     case 7:
                         {
                             // Multiply/Signed Multiply Long
-                            uint rdhi = (this.curInstruction >> 16) & 0xF;
-                            uint rdlo = (this.curInstruction >> 12) & 0xF;
-                            uint rs = (this.curInstruction >> 8) & 0xF;
-                            uint rm = this.curInstruction & 0xF;
+                            var rdhi = (curInstruction >> 16) & 0xF;
+                            var rdlo = (curInstruction >> 12) & 0xF;
+                            var rs = (curInstruction >> 8) & 0xF;
+                            var rm = curInstruction & 0xF;
 
-                            int cycles = 5;
+                            var cycles = 5;
                             // Multiply cycle calculations
                             if ((registers[rs] & 0xFFFFFF00) == 0 || (registers[rs] & 0xFFFFFF00) == 0xFFFFFF00)
                             {
@@ -1092,14 +1092,14 @@ namespace GarboDev.Cores.InterpretedCore
                                 cycles = 4;
                             }
 
-                            this.parent.Cycles -= cycles;
+                            parent.Cycles -= cycles;
 
-                            switch ((this.curInstruction >> 21) & 0x3)
+                            switch ((curInstruction >> 21) & 0x3)
                             {
                                 case 0:
                                     {
                                         // UMULL
-                                        ulong result = ((ulong)registers[rm]) * registers[rs];
+                                        var result = ((ulong)registers[rm]) * registers[rs];
                                         registers[rdhi] = (uint)(result >> 32);
                                         registers[rdlo] = (uint)(result & 0xFFFFFFFF);
                                         break;
@@ -1107,8 +1107,8 @@ namespace GarboDev.Cores.InterpretedCore
                                 case 1:
                                     {
                                         // UMLAL
-                                        ulong accum = (((ulong)registers[rdhi]) << 32) | registers[rdlo];
-                                        ulong result = ((ulong)registers[rm]) * registers[rs];
+                                        var accum = (((ulong)registers[rdhi]) << 32) | registers[rdlo];
+                                        var result = ((ulong)registers[rm]) * registers[rs];
                                         result += accum;
                                         registers[rdhi] = (uint)(result >> 32);
                                         registers[rdlo] = (uint)(result & 0xFFFFFFFF);
@@ -1117,7 +1117,7 @@ namespace GarboDev.Cores.InterpretedCore
                                 case 2:
                                     {
                                         // SMULL
-                                        long result = ((long)((int)registers[rm])) * ((long)((int)registers[rs]));
+                                        var result = (int)registers[rm] * ((long)((int)registers[rs]));
                                         registers[rdhi] = (uint)(result >> 32);
                                         registers[rdlo] = (uint)(result & 0xFFFFFFFF);
                                         break;
@@ -1125,8 +1125,8 @@ namespace GarboDev.Cores.InterpretedCore
                                 case 3:
                                     {
                                         // SMLAL
-                                        long accum = (((long)((int)registers[rdhi])) << 32) | registers[rdlo];
-                                        long result = ((long)((int)registers[rm])) * ((long)((int)registers[rs]));
+                                        var accum = (((long)((int)registers[rdhi])) << 32) | registers[rdlo];
+                                        var result = (int)registers[rm] * ((long)((int)registers[rs]));
                                         result += accum;
                                         registers[rdhi] = (uint)(result >> 32);
                                         registers[rdlo] = (uint)(result & 0xFFFFFFFF);
@@ -1134,7 +1134,7 @@ namespace GarboDev.Cores.InterpretedCore
                                     }
                             }
 
-                            if ((this.curInstruction & (1 << 20)) == 1 << 20)
+                            if ((curInstruction & (1 << 20)) == 1 << 20)
                             {
                                 negative = registers[rdhi] >> 31;
                                 zero = (registers[rdhi] == 0 && registers[rdlo] == 0) ? 1U : 0U;
@@ -1147,30 +1147,30 @@ namespace GarboDev.Cores.InterpretedCore
 
         private void LoadStoreHalfword()
         {
-            uint rn = (this.curInstruction >> 16) & 0xF;
-            uint rd = (this.curInstruction >> 12) & 0xF;
+            var rn = (curInstruction >> 16) & 0xF;
+            var rd = (curInstruction >> 12) & 0xF;
 
-            uint address = registers[rn];
+            var address = registers[rn];
 
-            bool preIndexed = (this.curInstruction & (1 << 24)) != 0;
-            bool byteTransfer = (this.curInstruction & (1 << 5)) == 0;
-            bool signedTransfer = (this.curInstruction & (1 << 6)) != 0;
-            bool writeback = (this.curInstruction & (1 << 21)) != 0;
+            var preIndexed = (curInstruction & (1 << 24)) != 0;
+            var byteTransfer = (curInstruction & (1 << 5)) == 0;
+            var signedTransfer = (curInstruction & (1 << 6)) != 0;
+            var writeback = (curInstruction & (1 << 21)) != 0;
 
             uint offset;
-            if ((this.curInstruction & (1 << 22)) != 0)
+            if ((curInstruction & (1 << 22)) != 0)
             {
                 // Immediate offset
-                offset = ((this.curInstruction & 0xF00) >> 4) | (this.curInstruction & 0xF);
+                offset = ((curInstruction & 0xF00) >> 4) | (curInstruction & 0xF);
             }
             else
             {
                 // Register offset
-                offset = this.registers[this.curInstruction & 0xF];
+                offset = registers[curInstruction & 0xF];
             }
 
             // Add or subtract offset
-            if ((this.curInstruction & (1 << 23)) == 0) offset = (uint)-offset;
+            if ((curInstruction & (1 << 23)) == 0) offset = (uint)-offset;
 
             if (preIndexed)
             {
@@ -1182,14 +1182,14 @@ namespace GarboDev.Cores.InterpretedCore
                 }
             }
 
-            if ((this.curInstruction & (1 << 20)) != 0)
+            if ((curInstruction & (1 << 20)) != 0)
             {
                 // Load
                 if (byteTransfer)
                 {
                     if (signedTransfer)
                     {
-                        registers[rd] = this.memory.ReadU8(address);
+                        registers[rd] = memory.ReadU8(address);
                         if ((registers[rd] & 0x80) != 0)
                         {
                             registers[rd] |= 0xFFFFFF00;
@@ -1197,14 +1197,14 @@ namespace GarboDev.Cores.InterpretedCore
                     }
                     else
                     {
-                        registers[rd] = this.memory.ReadU8(address);
+                        registers[rd] = memory.ReadU8(address);
                     }
                 }
                 else
                 {
                     if (signedTransfer)
                     {
-                        registers[rd] = this.memory.ReadU16(address);
+                        registers[rd] = memory.ReadU16(address);
                         if ((registers[rd] & 0x8000) != 0)
                         {
                             registers[rd] |= 0xFFFF0000;
@@ -1212,14 +1212,14 @@ namespace GarboDev.Cores.InterpretedCore
                     }
                     else
                     {
-                        registers[rd] = this.memory.ReadU16(address);
+                        registers[rd] = memory.ReadU16(address);
                     }
                 }
 
                 if (rd == 15)
                 {
                     registers[rd] &= ~3U;
-                    this.FlushQueue();
+                    FlushQueue();
                 }
 
                 if (!preIndexed)
@@ -1233,11 +1233,11 @@ namespace GarboDev.Cores.InterpretedCore
                 // Store
                 if (byteTransfer)
                 {
-                    this.memory.WriteU8(address, (byte)(registers[rd] & 0xFF));
+                    memory.WriteU8(address, (byte)(registers[rd] & 0xFF));
                 }
                 else
                 {
-                    this.memory.WriteU16(address, (ushort)(registers[rd] & 0xFFFF));
+                    memory.WriteU16(address, (ushort)(registers[rd] & 0xFFFF));
                 }
 
                 if (!preIndexed)
@@ -1250,24 +1250,24 @@ namespace GarboDev.Cores.InterpretedCore
 
         private void PackFlags()
         {
-            this.parent.CPSR &= 0x0FFFFFFF;
-            this.parent.CPSR |= this.negative << Arm7Processor.N_BIT;
-            this.parent.CPSR |= this.zero << Arm7Processor.Z_BIT;
-            this.parent.CPSR |= this.carry << Arm7Processor.C_BIT;
-            this.parent.CPSR |= this.overflow << Arm7Processor.V_BIT;
+            parent.CPSR &= 0x0FFFFFFF;
+            parent.CPSR |= negative << Arm7Processor.N_BIT;
+            parent.CPSR |= zero << Arm7Processor.Z_BIT;
+            parent.CPSR |= carry << Arm7Processor.C_BIT;
+            parent.CPSR |= overflow << Arm7Processor.V_BIT;
         }
 
         private void UnpackFlags()
         {
-            this.negative = (this.parent.CPSR >> Arm7Processor.N_BIT) & 1;
-            this.zero = (this.parent.CPSR >> Arm7Processor.Z_BIT) & 1;
-            this.carry = (this.parent.CPSR >> Arm7Processor.C_BIT) & 1;
-            this.overflow = (this.parent.CPSR >> Arm7Processor.V_BIT) & 1;
+            negative = (parent.CPSR >> Arm7Processor.N_BIT) & 1;
+            zero = (parent.CPSR >> Arm7Processor.Z_BIT) & 1;
+            carry = (parent.CPSR >> Arm7Processor.C_BIT) & 1;
+            overflow = (parent.CPSR >> Arm7Processor.V_BIT) & 1;
         }
 
         private void FlushQueue()
         {
-            this.instructionQueue = this.memory.ReadU32(registers[15]);
+            instructionQueue = memory.ReadU32(registers[15]);
             registers[15] += 4;
         }
     }

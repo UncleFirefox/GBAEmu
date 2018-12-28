@@ -9,7 +9,7 @@
             const Armlet.FlagDefinitions C = Armlet.FlagDefinitions.C_BIT;
             const Armlet.FlagDefinitions V = Armlet.FlagDefinitions.V_BIT;
 
-            Armlets.Definitions = new Armlet[]
+            Definitions = new Armlet[]
                 {
                     new Armlet("SetPc", ArmletOpcodes.Setpc, 0, 0, 2),
 
@@ -72,6 +72,6 @@
 
         public static readonly Armlet[] Definitions;
 
-        public static readonly Armlet Add = Armlets.Definitions[(int)ArmletOpcodes.Add];
+        public static readonly Armlet Add = Definitions[(int)ArmletOpcodes.Add];
     }
 }

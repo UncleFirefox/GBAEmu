@@ -10,86 +10,83 @@ namespace GarboDev.WinForms
 {
     public partial class SpriteWindow : Form
     {
-        private Memory memory = null;
-        private Bitmap bitmap = null;
-        private GbaManager.GbaManager gbaManager = null;
+        private Memory _memory;
+        private readonly Bitmap _bitmap;
 
         public SpriteWindow(GbaManager.GbaManager gbaManager)
         {
             InitializeComponent();
 
-            this.gbaManager = gbaManager;
-
-            this.bitmap = new Bitmap(128, 128, PixelFormat.Format32bppRgb);
-            this.spriteDisplay.Image = this.bitmap;
+            _bitmap = new Bitmap(128, 128, PixelFormat.Format32bppRgb);
+            spriteDisplay.Image = _bitmap;
             
-            this.Refresh();
+            Refresh();
 
-            this.gbaManager.OnCpuUpdate += new GbaManager.GbaManager.CpuUpdateDelegate(Update);
+            gbaManager.OnCpuUpdate += Update;
         }
 
         public void Update(Arm7Processor processor, Memory memory)
         {
-            this.memory = memory;
+            _memory = memory;
 
-            this.Refresh();
+            Refresh();
         }
 
         private void SpriteSelector_Scroll(object sender, EventArgs e)
         {
-            this.Refresh();
+            Refresh();
         }
 
         private new void Refresh()
         {
-            for (int y = 0; y < 128; y++)
+            for (var y = 0; y < 128; y++)
             {
-                for (int x = 0; x < 128; x++)
+                for (var x = 0; x < 128; x++)
                 {
-                    this.bitmap.SetPixel(x, y, Color.Black);
+                    _bitmap.SetPixel(x, y, Color.Black);
                 }
             }
 
-            if (this.memory == null)
+            if (_memory == null)
             {
-                this.spriteLeft.Text = "";
-                this.spriteTop.Text = "";
-                this.spriteWidth.Text = "";
-                this.spriteHeight.Text = "";
-                this.spriteBase.Text = "";
-                this.spriteBlend.Text = "";
-                this.spriteMode.Text = "";
-                this.spritePal.Text = "";
-                this.spritePri.Text = "";
-                this.spriteWind.Text = "";
+                spriteLeft.Text = "";
+                spriteTop.Text = "";
+                spriteWidth.Text = "";
+                spriteHeight.Text = "";
+                spriteBase.Text = "";
+                spriteBlend.Text = "";
+                spriteMode.Text = "";
+                spritePal.Text = "";
+                spritePri.Text = "";
+                spriteWind.Text = "";
             }
             else
             {
-                int oamNum = this.spriteSelector.Value;
+                var oamNum = spriteSelector.Value;
 
-                this.DrawSprite(oamNum);
+                DrawSprite(oamNum);
 
-                ushort attr0 = this.memory.ReadU16Debug(Memory.OAM_BASE + (uint)(oamNum * 8) + 0);
-                ushort attr1 = this.memory.ReadU16Debug(Memory.OAM_BASE + (uint)(oamNum * 8) + 2);
-                ushort attr2 = this.memory.ReadU16Debug(Memory.OAM_BASE + (uint)(oamNum * 8) + 4);
+                var attr0 = _memory.ReadU16Debug(Memory.OAM_BASE + (uint)(oamNum * 8) + 0);
+                var attr1 = _memory.ReadU16Debug(Memory.OAM_BASE + (uint)(oamNum * 8) + 2);
+                var attr2 = _memory.ReadU16Debug(Memory.OAM_BASE + (uint)(oamNum * 8) + 4);
 
-                this.spriteLeft.Text = (attr1 & 0x1FF).ToString();
-                this.spriteTop.Text = (attr0 & 0xFF).ToString();
+                spriteLeft.Text = (attr1 & 0x1FF).ToString();
+                spriteTop.Text = (attr0 & 0xFF).ToString();
 
-                this.spritePri.Text = ((attr2 >> 10) & 3).ToString();
+                spritePri.Text = ((attr2 >> 10) & 3).ToString();
 
-                this.spriteBlend.Text = "None";
-                this.spriteWind.Text = "None";
+                spriteBlend.Text = "None";
+                spriteWind.Text = "None";
 
                 switch ((attr0 >> 10) & 3)
                 {
                     case 1:
                         // Semi-transparent
-                        this.spriteBlend.Text = "Blending";
+                        spriteBlend.Text = "Blending";
                         break;
                     case 2:
                         // Obj window
-                        this.spriteWind.Text = "Window";
+                        spriteWind.Text = "Window";
                         break;
                     case 3:
                         // Invalid
@@ -131,39 +128,39 @@ namespace GarboDev.WinForms
                         break;
                 }
 
-                this.spriteWidth.Text = width.ToString();
-                this.spriteHeight.Text = height.ToString();
+                spriteWidth.Text = width.ToString();
+                spriteHeight.Text = height.ToString();
 
                 // Check double size flag here
 
                 if ((attr0 & (1 << 8)) != 0)
                 {
-                    this.spriteMode.Text = "Rot/Scale";
+                    spriteMode.Text = "Rot/Scale";
                 }
                 else
                 {
-                    this.spriteMode.Text = "Normal";
+                    spriteMode.Text = "Normal";
                 }
             }
 
-            this.spriteNumber.Text = this.spriteSelector.Value.ToString();
+            spriteNumber.Text = spriteSelector.Value.ToString();
 
-            this.spriteDisplay.Image = this.bitmap;
-            this.spriteDisplay.Invalidate();
+            spriteDisplay.Image = _bitmap;
+            spriteDisplay.Invalidate();
         }
 
         private void DrawSprite(int oamNum)
         {
-            byte[] palette = this.memory.PaletteRam;
-            byte[] vram = this.memory.VideoRam;
+            var palette = _memory.PaletteRam;
+            var vram = _memory.VideoRam;
 
-            ushort dispCnt = Memory.ReadU16(this.memory.IORam, Memory.DISPCNT);
+            var dispCnt = Memory.ReadU16(_memory.IORam, Memory.DISPCNT);
 
-            ushort attr0 = this.memory.ReadU16Debug(Memory.OAM_BASE + (uint)(oamNum * 8) + 0);
-            ushort attr1 = this.memory.ReadU16Debug(Memory.OAM_BASE + (uint)(oamNum * 8) + 2);
-            ushort attr2 = this.memory.ReadU16Debug(Memory.OAM_BASE + (uint)(oamNum * 8) + 4);
+            var attr0 = _memory.ReadU16Debug(Memory.OAM_BASE + (uint)(oamNum * 8) + 0);
+            var attr1 = _memory.ReadU16Debug(Memory.OAM_BASE + (uint)(oamNum * 8) + 2);
+            var attr2 = _memory.ReadU16Debug(Memory.OAM_BASE + (uint)(oamNum * 8) + 4);
 
-            bool window = false;
+            var window = false;
             switch ((attr0 >> 10) & 3)
             {
                 case 1:
@@ -231,10 +228,10 @@ namespace GarboDev.WinForms
                     width = -1;
             }
 
-            int scale = 1;
+            var scale = 1;
             if ((attr0 & (1 << 13)) != 0) scale = 2;
 
-            for (int spritey = 0; spritey < height; spritey++)
+            for (var spritey = 0; spritey < height; spritey++)
             {
                 if ((attr0 & (1 << 8)) == 0)
                 {
@@ -252,7 +249,7 @@ namespace GarboDev.WinForms
                         baseSprite = (attr2 & 0x3FF) + ((spritey / 8) * 0x20);
                     }
 
-                    int baseInc = scale;
+                    var baseInc = scale;
                     if ((attr1 & (1 << 12)) != 0)
                     {
                         baseSprite += ((width / 8) * scale) - scale;
@@ -262,19 +259,19 @@ namespace GarboDev.WinForms
                     if ((attr0 & (1 << 13)) != 0)
                     {
                         // 256 colors
-                        for (int i = 0; i < width; i++)
+                        for (var i = 0; i < width; i++)
                         {
                             if ((i & 0x1ff) < 240 && true)
                             {
-                                int tx = i & 7;
+                                var tx = i & 7;
                                 if ((attr1 & (1 << 12)) != 0) tx = 7 - tx;
-                                int curIdx = baseSprite * 32 + ((spritey & 7) * 8) + tx;
+                                var curIdx = baseSprite * 32 + ((spritey & 7) * 8) + tx;
                                 int lookup = vram[0x10000 + curIdx];
                                 if (lookup != 0)
                                 {
-                                    uint pixelColor = Renderer.GbaTo32((ushort)(palette[0x200 + lookup * 2] | (palette[0x200 + lookup * 2 + 1] << 8)));
+                                    var pixelColor = Renderer.GbaTo32((ushort)(palette[0x200 + lookup * 2] | (palette[0x200 + lookup * 2 + 1] << 8)));
                                     if (window) pixelColor = 0xFFFFFFFF;
-                                    this.bitmap.SetPixel(i & 0x1ff, spritey, Color.FromArgb((int)(0xFF000000 | pixelColor)));
+                                    _bitmap.SetPixel(i & 0x1ff, spritey, Color.FromArgb((int)(0xFF000000 | pixelColor)));
                                 }
                             }
                             if ((i & 7) == 7) baseSprite += baseInc;
@@ -283,14 +280,14 @@ namespace GarboDev.WinForms
                     else
                     {
                         // 16 colors
-                        int palIdx = 0x200 + (((attr2 >> 12) & 0xF) * 16 * 2);
-                        for (int i = 0; i < width; i++)
+                        var palIdx = 0x200 + (((attr2 >> 12) & 0xF) * 16 * 2);
+                        for (var i = 0; i < width; i++)
                         {
                             if ((i & 0x1ff) < 240 && true)
                             {
-                                int tx = i & 7;
+                                var tx = i & 7;
                                 if ((attr1 & (1 << 12)) != 0) tx = 7 - tx;
-                                int curIdx = baseSprite * 32 + ((spritey & 7) * 4) + (tx / 2);
+                                var curIdx = baseSprite * 32 + ((spritey & 7) * 4) + (tx / 2);
                                 int lookup = vram[0x10000 + curIdx];
                                 if ((tx & 1) == 0)
                                 {
@@ -302,9 +299,9 @@ namespace GarboDev.WinForms
                                 }
                                 if (lookup != 0)
                                 {
-                                    uint pixelColor = Renderer.GbaTo32((ushort)(palette[palIdx + lookup * 2] | (palette[palIdx + lookup * 2 + 1] << 8)));
+                                    var pixelColor = Renderer.GbaTo32((ushort)(palette[palIdx + lookup * 2] | (palette[palIdx + lookup * 2 + 1] << 8)));
                                     if (window) pixelColor = 0xFFFFFFFF;
-                                    this.bitmap.SetPixel(i & 0x1ff, spritey, Color.FromArgb((int)(0xFF000000 | pixelColor)));
+                                    _bitmap.SetPixel(i & 0x1ff, spritey, Color.FromArgb((int)(0xFF000000 | pixelColor)));
                                 }
                             }
                             if ((i & 7) == 7) baseSprite += baseInc;
@@ -313,17 +310,17 @@ namespace GarboDev.WinForms
                 }
                 else
                 {
-                    int rotScaleParam = (attr1 >> 9) & 0x1F;
+                    var rotScaleParam = (attr1 >> 9) & 0x1F;
 
-                    short dx = (short)this.memory.ReadU16Debug(Memory.OAM_BASE + (uint)(rotScaleParam * 8 * 4) + 0x6);
-                    short dmx = (short)this.memory.ReadU16Debug(Memory.OAM_BASE + (uint)(rotScaleParam * 8 * 4) + 0xE);
-                    short dy = (short)this.memory.ReadU16Debug(Memory.OAM_BASE + (uint)(rotScaleParam * 8 * 4) + 0x16);
-                    short dmy = (short)this.memory.ReadU16Debug(Memory.OAM_BASE + (uint)(rotScaleParam * 8 * 4) + 0x1E);
+                    var dx = (short)_memory.ReadU16Debug(Memory.OAM_BASE + (uint)(rotScaleParam * 8 * 4) + 0x6);
+                    var dmx = (short)_memory.ReadU16Debug(Memory.OAM_BASE + (uint)(rotScaleParam * 8 * 4) + 0xE);
+                    var dy = (short)_memory.ReadU16Debug(Memory.OAM_BASE + (uint)(rotScaleParam * 8 * 4) + 0x16);
+                    var dmy = (short)_memory.ReadU16Debug(Memory.OAM_BASE + (uint)(rotScaleParam * 8 * 4) + 0x1E);
 
-                    int cx = rwidth / 2;
-                    int cy = rheight / 2;
+                    var cx = rwidth / 2;
+                    var cy = rheight / 2;
 
-                    int baseSprite = attr2 & 0x3FF;
+                    var baseSprite = attr2 & 0x3FF;
                     int pitch;
 
                     if ((dispCnt & (1 << 6)) != 0)
@@ -337,28 +334,28 @@ namespace GarboDev.WinForms
                         pitch = 0x20;
                     }
 
-                    short rx = (short)((dmx * (spritey - cy)) - (cx * dx) + (width << 7));
-                    short ry = (short)((dmy * (spritey - cy)) - (cx * dy) + (height << 7));
+                    var rx = (short)((dmx * (spritey - cy)) - (cx * dx) + (width << 7));
+                    var ry = (short)((dmy * (spritey - cy)) - (cx * dy) + (height << 7));
 
                     // Draw a rot/scale sprite
                     if ((attr0 & (1 << 13)) != 0)
                     {
                         // 256 colors
-                        for (int i = 0; i < rwidth; i++)
+                        for (var i = 0; i < rwidth; i++)
                         {
-                            int tx = rx >> 8;
-                            int ty = ry >> 8;
+                            var tx = rx >> 8;
+                            var ty = ry >> 8;
 
                             if ((i & 0x1ff) < 240 && tx >= 0 && tx < width && ty >= 0 && ty < height
                                 && true)
                             {
-                                int curIdx = (baseSprite + ((ty / 8) * pitch) + ((tx / 8) * scale)) * 32 + ((ty & 7) * 8) + (tx & 7);
+                                var curIdx = (baseSprite + ((ty / 8) * pitch) + ((tx / 8) * scale)) * 32 + ((ty & 7) * 8) + (tx & 7);
                                 int lookup = vram[0x10000 + curIdx];
                                 if (lookup != 0)
                                 {
-                                    uint pixelColor = Renderer.GbaTo32((ushort)(palette[0x200 + lookup * 2] | (palette[0x200 + lookup * 2 + 1] << 8)));
+                                    var pixelColor = Renderer.GbaTo32((ushort)(palette[0x200 + lookup * 2] | (palette[0x200 + lookup * 2 + 1] << 8)));
                                     if (window) pixelColor = 0xFFFFFFFF;
-                                    this.bitmap.SetPixel(i & 0x1ff, spritey, Color.FromArgb((int)(0xFF000000 | pixelColor)));
+                                    _bitmap.SetPixel(i & 0x1ff, spritey, Color.FromArgb((int)(0xFF000000 | pixelColor)));
                                 }
                             }
 
@@ -369,16 +366,16 @@ namespace GarboDev.WinForms
                     else
                     {
                         // 16 colors
-                        int palIdx = 0x200 + (((attr2 >> 12) & 0xF) * 16 * 2);
-                        for (int i = 0; i < rwidth; i++)
+                        var palIdx = 0x200 + (((attr2 >> 12) & 0xF) * 16 * 2);
+                        for (var i = 0; i < rwidth; i++)
                         {
-                            int tx = rx >> 8;
-                            int ty = ry >> 8;
+                            var tx = rx >> 8;
+                            var ty = ry >> 8;
 
                             if ((i & 0x1ff) < 240 && tx >= 0 && tx < width && ty >= 0 && ty < height
                                 && true)
                             {
-                                int curIdx = (baseSprite + ((ty / 8) * pitch) + ((tx / 8) * scale)) * 32 + ((ty & 7) * 4) + ((tx & 7) / 2);
+                                var curIdx = (baseSprite + ((ty / 8) * pitch) + ((tx / 8) * scale)) * 32 + ((ty & 7) * 4) + ((tx & 7) / 2);
                                 int lookup = vram[0x10000 + curIdx];
                                 if ((tx & 1) == 0)
                                 {
@@ -390,9 +387,9 @@ namespace GarboDev.WinForms
                                 }
                                 if (lookup != 0)
                                 {
-                                    uint pixelColor = Renderer.GbaTo32((ushort)(palette[palIdx + lookup * 2] | (palette[palIdx + lookup * 2 + 1] << 8)));
+                                    var pixelColor = Renderer.GbaTo32((ushort)(palette[palIdx + lookup * 2] | (palette[palIdx + lookup * 2 + 1] << 8)));
                                     if (window) pixelColor = 0xFFFFFFFF;
-                                    this.bitmap.SetPixel(i & 0x1ff, spritey, Color.FromArgb((int)(0xFF000000 | pixelColor)));
+                                    _bitmap.SetPixel(i & 0x1ff, spritey, Color.FromArgb((int)(0xFF000000 | pixelColor)));
                                 }
                             }
 

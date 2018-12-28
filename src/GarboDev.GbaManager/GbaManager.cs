@@ -13,36 +13,28 @@ namespace GarboDev.GbaManager
 {
     public class GbaManager
     {
-        private readonly Thread _executionThread = null;
+        private readonly Thread _executionThread;
 
         private bool _running;
 
         public delegate void CpuUpdateDelegate(Arm7Processor processor, Memory memory);
-        private event CpuUpdateDelegate onCpuUpdate = null;
+        private event CpuUpdateDelegate onCpuUpdate;
 
-        public Arm7Processor Arm7 { get; private set; } = null;
+        public Arm7Processor Arm7 { get; private set; }
 
-        public VideoManager VideoManager { get; private set; } = null;
+        public VideoManager VideoManager { get; private set; }
 
-        public SoundManager SoundManager { get; private set; } = null;
+        public SoundManager SoundManager { get; private set; }
 
-        public Memory Memory { get; private set; } = null;
+        public Memory Memory { get; private set; }
 
-        public Dictionary<uint, bool> Breakpoints => this.Arm7.Breakpoints;
+        public Dictionary<uint, bool> Breakpoints => Arm7.Breakpoints;
 
         public ushort KeyState
         {
-            get
-            {
-                if (this.Memory != null)
-                {
-                    return this.Memory.KeyState;
-                }
+            get => Memory?.KeyState ?? 0x3FF;
 
-                return 0x3FF;
-            }
-
-            set => this.Arm7.KeyState = value;
+            set => Arm7.KeyState = value;
         }
 
         public int FramesRendered { get; set; }
@@ -51,10 +43,10 @@ namespace GarboDev.GbaManager
         {
             add
             {
-                this.onCpuUpdate += value;
-                this.onCpuUpdate(this.Arm7, this.Memory);
+                onCpuUpdate += value;
+                onCpuUpdate?.Invoke(Arm7, Memory);
             }
-            remove => this.onCpuUpdate -= value;
+            remove => onCpuUpdate -= value;
         }
 
         public bool SkipBios { get; set; } = true;
@@ -65,14 +57,14 @@ namespace GarboDev.GbaManager
 
         public GbaManager()
         {
-            this.FramesRendered = 0;
+            FramesRendered = 0;
 
-            this.Halt();
+            Halt();
 
-            this._running = true;
+            _running = true;
 
-            this._executionThread = new Thread(new ParameterizedThreadStart(RunEmulationLoop));
-            this._executionThread.Start();
+            _executionThread = new Thread(RunEmulationLoop);
+            _executionThread.Start();
 
             // Wait for the initialization to complete
             Monitor.Wait(this);
@@ -80,13 +72,13 @@ namespace GarboDev.GbaManager
 
         public void Close()
         {
-            if (this._running)
+            if (_running)
             {
-                this._running = false;
+                _running = false;
 
-                if (this.Halted)
+                if (Halted)
                 {
-                    this.Resume();
+                    Resume();
                 }
 
                 Monitor.Enter(this);
@@ -96,20 +88,20 @@ namespace GarboDev.GbaManager
 
         public void Halt()
         {
-            if (this.Halted) return;
+            if (Halted) return;
 
-            this.Halted = true;
+            Halted = true;
             Monitor.Enter(this);
         }
 
         public void Resume()
         {
-            if (!this.Halted) return;
+            if (!Halted) return;
 
-            this.Halted = false;
+            Halted = false;
 
-            this.iterations = 0;
-            this.timer.Start();
+            _iterations = 0;
+            _timer.Start();
 
             Monitor.Pulse(this);
             Monitor.Exit(this);
@@ -117,21 +109,21 @@ namespace GarboDev.GbaManager
 
         public void Reset()
         {
-            this.Halt();
+            Halt();
 
-            this.Arm7.Reset(this.SkipBios);
-            this.Memory.Reset();
-            this.VideoManager.Reset();
+            Arm7.Reset(SkipBios);
+            Memory.Reset();
+            VideoManager.Reset();
         }
 
-        public PullAudio AudioMixer => this.AudioMixerStereo;
+        public PullAudio AudioMixer => AudioMixerStereo;
 
         public void AudioMixerStereo(short[] buffer, int length)
         {
             // even = left, odd = right
-            if (this.SoundManager.SamplesMixed > Math.Max(500, length))
+            if (SoundManager.SamplesMixed > Math.Max(500, length))
             {
-                this.SoundManager.GetSamples(buffer, length);
+                SoundManager.GetSamples(buffer, length);
             }
         }
 
@@ -146,16 +138,16 @@ namespace GarboDev.GbaManager
 
         public void LoadBios(byte[] biosRom)
         {
-            this.Memory.LoadBios(biosRom);
+            Memory.LoadBios(biosRom);
 
-            this.onCpuUpdate?.Invoke(this.Arm7, this.Memory);
+            onCpuUpdate?.Invoke(Arm7, Memory);
         }
 
         public void LoadRom(byte[] cartRom)
         {
-            this.Halt();
+            Halt();
 
-            byte[] logo = new byte[]
+            var logo = new byte[]
                     {
             			0x24,0xff,0xae,0x51,0x69,0x9a,0xa2,0x21,
             			0x3d,0x84,0x82,0x0a,0x84,0xe4,0x09,0xad,
@@ -182,99 +174,99 @@ namespace GarboDev.GbaManager
             Array.Copy(logo, 0, cartRom, 4, logo.Length);
             cartRom[0xB2] = 0x96;
             cartRom[0xBD] = 0;
-            for (int i = 0xA0; i <= 0xBC; i++) cartRom[0xBD] = (byte)(cartRom[0xBD] - cartRom[i]);
+            for (var i = 0xA0; i <= 0xBC; i++) cartRom[0xBD] = (byte)(cartRom[0xBD] - cartRom[i]);
             cartRom[0xBD] = (byte)((cartRom[0xBD] - 0x19) & 0xFF);
 
-            this.Memory.LoadCartridge(cartRom);
+            Memory.LoadCartridge(cartRom);
 
-            this.Reset();
+            Reset();
 
-            onCpuUpdate?.Invoke(this.Arm7, this.Memory);
+            onCpuUpdate?.Invoke(Arm7, Memory);
         }
 
         public void Step()
         {
-            this.Halt();
+            Halt();
 
-            this.Arm7.Step();
+            Arm7.Step();
 
-            onCpuUpdate?.Invoke(this.Arm7, this.Memory);
+            onCpuUpdate?.Invoke(Arm7, Memory);
         }
 
         public void StepScanline()
         {
-            this.Halt();
+            Halt();
 
-            this.Arm7.Execute(960);
-            this.VideoManager.RenderLine();
-            this.VideoManager.EnterHBlank(this.Arm7);
-            this.Arm7.Execute(272);
-            this.VideoManager.LeaveHBlank(this.Arm7);
+            Arm7.Execute(960);
+            VideoManager.RenderLine();
+            VideoManager.EnterHBlank(Arm7);
+            Arm7.Execute(272);
+            VideoManager.LeaveHBlank(Arm7);
 
-            onCpuUpdate?.Invoke(this.Arm7, this.Memory);
+            onCpuUpdate?.Invoke(Arm7, Memory);
         }
 
-        private HighPerformanceTimer timer = new HighPerformanceTimer();
-        private double iterations;
+        private readonly HighPerformanceTimer _timer = new HighPerformanceTimer();
+        private double _iterations;
 
-        public double SecondsSinceStarted => this.timer.ElapsedSeconds;
+        public double SecondsSinceStarted => _timer.ElapsedSeconds;
 
         private void RunEmulationLoop(object threadParams)
         {
-            this.Memory = new Memory();
-            this.SoundManager = new SoundManager(this.Memory, 44100);
-            this.Arm7 = new Arm7Processor(this.Memory, this.SoundManager);
-            this.VideoManager = new VideoManager(() => FramesRendered++) {Memory = this.Memory};
+            Memory = new Memory();
+            SoundManager = new SoundManager(Memory, 44100);
+            Arm7 = new Arm7Processor(Memory, SoundManager);
+            VideoManager = new VideoManager(() => FramesRendered++) {Memory = Memory};
 
             lock (this)
             {
                 Monitor.Pulse(this);
                 Monitor.Wait(this);
 
-                this.iterations = 0;
-                this.timer.Start();
+                _iterations = 0;
+                _timer.Start();
 
-                int vramCycles = 0;
-                bool inHblank = false;
+                var vramCycles = 0;
+                var inHblank = false;
 
-                HighPerformanceTimer profileTimer = new HighPerformanceTimer();
+                var profileTimer = new HighPerformanceTimer();
 
-                while (this._running)
+                while (_running)
                 {
-                    if (this.Halted)
+                    if (Halted)
                     {
                         Monitor.Pulse(this);
                         Monitor.Wait(this);
                     }
 
-                    if (!this.LimitFps ||
-                        iterations < timer.ElapsedSeconds)
+                    if (!LimitFps ||
+                        _iterations < _timer.ElapsedSeconds)
                     {
                         const int numSteps = 2284;
                         const int cycleStep = 123;
 
-                        for (int i = 0; i < numSteps; i++)
+                        for (var i = 0; i < numSteps; i++)
                         {
                             if (vramCycles <= 0)
                             {
-                                if (!this._running || this.Halted) break;
+                                if (!_running || Halted) break;
 
                                 if (inHblank)
                                 {
                                     vramCycles += 960;
-                                    this.VideoManager.LeaveHBlank(this.Arm7);
+                                    VideoManager.LeaveHBlank(Arm7);
                                     inHblank = false;
                                 }
                                 else
                                 {
                                     vramCycles += 272;
-                                    this.VideoManager.RenderLine();
-                                    this.VideoManager.EnterHBlank(this.Arm7);
+                                    VideoManager.RenderLine();
+                                    VideoManager.EnterHBlank(Arm7);
                                     inHblank = true;
                                 }
                             }
 
-                            this.Arm7.Execute(cycleStep);
+                            Arm7.Execute(cycleStep);
 
 #if ARM_DEBUG
                             if (this.arm7.BreakpointHit)
@@ -286,10 +278,10 @@ namespace GarboDev.GbaManager
 
                             vramCycles -= cycleStep;
 
-                            this.Arm7.FireIrq();
+                            Arm7.FireIrq();
                         }
 
-                        iterations += (cycleStep * numSteps) / ((double)Constants.CpuFreq);
+                        _iterations += (cycleStep * numSteps) / ((double)Constants.CpuFreq);
                     }
 
                     Thread.Sleep(0);

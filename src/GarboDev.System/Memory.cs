@@ -108,19 +108,19 @@ namespace GarboDev.CrossCutting
         private const uint oamRamMask = 0x3FF;
         private const uint sRamMask = 0xFFFF;
 
-        private byte[] biosRam = new byte[Memory.biosRamMask + 1];
-        private byte[] ewRam = new byte[Memory.ewRamMask + 1];
-        private byte[] iwRam = new byte[Memory.iwRamMask + 1];
-        private byte[] ioReg = new byte[Memory.ioRegMask + 1];
-        private byte[] sRam = new byte[Memory.sRamMask + 1];
+        private readonly byte[] biosRam = new byte[biosRamMask + 1];
+        private readonly byte[] ewRam = new byte[ewRamMask + 1];
+        private readonly byte[] iwRam = new byte[iwRamMask + 1];
+        private readonly byte[] ioReg = new byte[ioRegMask + 1];
+        private readonly byte[] sRam = new byte[sRamMask + 1];
 
-        public byte[] VideoRam { get; } = new byte[Memory.vRamMask + 1];
+        public byte[] VideoRam { get; } = new byte[vRamMask + 1];
 
-        public byte[] PaletteRam { get; } = new byte[Memory.palRamMask + 1];
+        public byte[] PaletteRam { get; } = new byte[palRamMask + 1];
 
-        public byte[] OamRam { get; } = new byte[Memory.oamRamMask + 1];
+        public byte[] OamRam { get; } = new byte[oamRamMask + 1];
 
-        public byte[] IORam => this.ioReg;
+        public byte[] IORam => ioReg;
 
         public ushort KeyState { get; set; } = 0x3FF;
 
@@ -137,22 +137,22 @@ namespace GarboDev.CrossCutting
         public Action ResetSoundFifoA { get; set; }
         public Action ResetSoundFifoB { get; set; }
 
-        private byte[] romBank1 = null;
-        private byte[] romBank2 = null;
-        private uint romBank1Mask = 0;
-        private uint romBank2Mask = 0;
+        private byte[] romBank1;
+        private byte[] romBank2;
+        private uint romBank1Mask;
+        private uint romBank2Mask;
 
-        private int[] bankSTimes = new int[0x10];
-        private int[] bankNTimes = new int[0x10];
+        private readonly int[] bankSTimes = new int[0x10];
+        private int[] _bankNTimes = new int[0x10];
 
-        private int waitCycles = 0;
+        private int _waitCycles;
         
         public int WaitCycles
         {
-            get { int tmp = this.waitCycles; this.waitCycles = 0; return tmp; }
+            get { var tmp = _waitCycles; _waitCycles = 0; return tmp; }
         }
 
-        private bool inUnreadable = false;
+        private bool _inUnreadable;
 
         private delegate byte ReadU8Delegate(uint address);
         private delegate void WriteU8Delegate(uint address, byte value);
@@ -161,203 +161,204 @@ namespace GarboDev.CrossCutting
         private delegate uint ReadU32Delegate(uint address);
         private delegate void WriteU32Delegate(uint address, uint value);
 
-        private ReadU8Delegate[] ReadU8Funcs = null;
-        private WriteU8Delegate[] WriteU8Funcs = null;
-        private ReadU16Delegate[] ReadU16Funcs = null;
-        private WriteU16Delegate[] WriteU16Funcs = null;
-        private ReadU32Delegate[] ReadU32Funcs = null;
-        private WriteU32Delegate[] WriteU32Funcs = null;
+        private readonly ReadU8Delegate[] ReadU8Funcs;
+        private readonly WriteU8Delegate[] WriteU8Funcs;
+        private readonly ReadU16Delegate[] ReadU16Funcs;
+        private readonly WriteU16Delegate[] WriteU16Funcs;
+        private readonly ReadU32Delegate[] ReadU32Funcs;
+        private readonly WriteU32Delegate[] WriteU32Funcs;
 
-        private uint[,] dmaRegs = new uint[4, 4];
-        private uint[] timerCnt = new uint[4];
-        private int[] bgx = new int[2], bgy = new int[2];
+        private readonly uint[,] dmaRegs = new uint[4, 4];
+        private readonly uint[] timerCnt = new uint[4];
+        private readonly int[] bgx = new int[2];
+        private readonly int[] bgy = new int[2];
 
-        public uint[] TimerCnt => this.timerCnt;
+        public uint[] TimerCnt => timerCnt;
 
-        public int[] Bgx => this.bgx;
+        public int[] Bgx => bgx;
 
-        public int[] Bgy => this.bgy;
+        public int[] Bgy => bgy;
 
         public Memory()
         {
-            this.ReadU8Funcs = new ReadU8Delegate[]
+            ReadU8Funcs = new ReadU8Delegate[]
                 {
-                    this.ReadBiosRam8,
-                    this.ReadNop8,
-                    this.ReadEwRam8,
-                    this.ReadIwRam8,
-                    this.ReadIO8,
-                    this.ReadPalRam8,
-                    this.ReadVRam8,
-                    this.ReadOamRam8,
-                    this.ReadNop8,
-                    this.ReadNop8,
-                    this.ReadNop8,
-                    this.ReadNop8,
-                    this.ReadNop8,
-                    this.ReadNop8,
-                    this.ReadSRam8,
-                    this.ReadNop8
+                    ReadBiosRam8,
+                    ReadNop8,
+                    ReadEwRam8,
+                    ReadIwRam8,
+                    ReadIO8,
+                    ReadPalRam8,
+                    ReadVRam8,
+                    ReadOamRam8,
+                    ReadNop8,
+                    ReadNop8,
+                    ReadNop8,
+                    ReadNop8,
+                    ReadNop8,
+                    ReadNop8,
+                    ReadSRam8,
+                    ReadNop8
                 };
 
-            this.WriteU8Funcs = new WriteU8Delegate[]
+            WriteU8Funcs = new WriteU8Delegate[]
                 {
-                    this.WriteNop8,
-                    this.WriteNop8,
-                    this.WriteEwRam8,
-                    this.WriteIwRam8,
-                    this.WriteIO8,
-                    this.WritePalRam8,
-                    this.WriteVRam8,
-                    this.WriteOamRam8,
-                    this.WriteNop8,
-                    this.WriteNop8,
-                    this.WriteNop8,
-                    this.WriteNop8,
-                    this.WriteNop8,
-                    this.WriteNop8,
-                    this.WriteSRam8,
-                    this.WriteNop8
+                    WriteNop8,
+                    WriteNop8,
+                    WriteEwRam8,
+                    WriteIwRam8,
+                    WriteIO8,
+                    WritePalRam8,
+                    WriteVRam8,
+                    WriteOamRam8,
+                    WriteNop8,
+                    WriteNop8,
+                    WriteNop8,
+                    WriteNop8,
+                    WriteNop8,
+                    WriteNop8,
+                    WriteSRam8,
+                    WriteNop8
                 };
 
-            this.ReadU16Funcs = new ReadU16Delegate[]
+            ReadU16Funcs = new ReadU16Delegate[]
                 {
-                    this.ReadBiosRam16,
-                    this.ReadNop16,
-                    this.ReadEwRam16,
-                    this.ReadIwRam16,
-                    this.ReadIO16,
-                    this.ReadPalRam16,
-                    this.ReadVRam16,
-                    this.ReadOamRam16,
-                    this.ReadNop16,
-                    this.ReadNop16,
-                    this.ReadNop16,
-                    this.ReadNop16,
-                    this.ReadNop16,
-                    this.ReadNop16,
-                    this.ReadSRam16,
-                    this.ReadNop16
+                    ReadBiosRam16,
+                    ReadNop16,
+                    ReadEwRam16,
+                    ReadIwRam16,
+                    ReadIO16,
+                    ReadPalRam16,
+                    ReadVRam16,
+                    ReadOamRam16,
+                    ReadNop16,
+                    ReadNop16,
+                    ReadNop16,
+                    ReadNop16,
+                    ReadNop16,
+                    ReadNop16,
+                    ReadSRam16,
+                    ReadNop16
                 };
 
-            this.WriteU16Funcs = new WriteU16Delegate[]
+            WriteU16Funcs = new WriteU16Delegate[]
                 {
-                    this.WriteNop16,
-                    this.WriteNop16,
-                    this.WriteEwRam16,
-                    this.WriteIwRam16,
-                    this.WriteIO16,
-                    this.WritePalRam16,
-                    this.WriteVRam16,
-                    this.WriteOamRam16,
-                    this.WriteNop16,
-                    this.WriteNop16,
-                    this.WriteNop16,
-                    this.WriteNop16,
-                    this.WriteNop16,
-                    this.WriteNop16,
-                    this.WriteSRam16,
-                    this.WriteNop16
+                    WriteNop16,
+                    WriteNop16,
+                    WriteEwRam16,
+                    WriteIwRam16,
+                    WriteIO16,
+                    WritePalRam16,
+                    WriteVRam16,
+                    WriteOamRam16,
+                    WriteNop16,
+                    WriteNop16,
+                    WriteNop16,
+                    WriteNop16,
+                    WriteNop16,
+                    WriteNop16,
+                    WriteSRam16,
+                    WriteNop16
                 };
 
-            this.ReadU32Funcs = new ReadU32Delegate[]
+            ReadU32Funcs = new ReadU32Delegate[]
                 {
-                    this.ReadBiosRam32,
-                    this.ReadNop32,
-                    this.ReadEwRam32,
-                    this.ReadIwRam32,
-                    this.ReadIO32,
-                    this.ReadPalRam32,
-                    this.ReadVRam32,
-                    this.ReadOamRam32,
-                    this.ReadNop32,
-                    this.ReadNop32,
-                    this.ReadNop32,
-                    this.ReadNop32,
-                    this.ReadNop32,
-                    this.ReadNop32,
-                    this.ReadSRam32,
-                    this.ReadNop32
+                    ReadBiosRam32,
+                    ReadNop32,
+                    ReadEwRam32,
+                    ReadIwRam32,
+                    ReadIO32,
+                    ReadPalRam32,
+                    ReadVRam32,
+                    ReadOamRam32,
+                    ReadNop32,
+                    ReadNop32,
+                    ReadNop32,
+                    ReadNop32,
+                    ReadNop32,
+                    ReadNop32,
+                    ReadSRam32,
+                    ReadNop32
                 };
 
-            this.WriteU32Funcs = new WriteU32Delegate[]
+            WriteU32Funcs = new WriteU32Delegate[]
                 {
-                    this.WriteNop32,
-                    this.WriteNop32,
-                    this.WriteEwRam32,
-                    this.WriteIwRam32,
-                    this.WriteIO32,
-                    this.WritePalRam32,
-                    this.WriteVRam32,
-                    this.WriteOamRam32,
-                    this.WriteNop32,
-                    this.WriteNop32,
-                    this.WriteNop32,
-                    this.WriteNop32,
-                    this.WriteNop32,
-                    this.WriteNop32,
-                    this.WriteSRam32,
-                    this.WriteNop32
+                    WriteNop32,
+                    WriteNop32,
+                    WriteEwRam32,
+                    WriteIwRam32,
+                    WriteIO32,
+                    WritePalRam32,
+                    WriteVRam32,
+                    WriteOamRam32,
+                    WriteNop32,
+                    WriteNop32,
+                    WriteNop32,
+                    WriteNop32,
+                    WriteNop32,
+                    WriteNop32,
+                    WriteSRam32,
+                    WriteNop32
                 };
         }
 
         public void Reset()
         {
-            Array.Clear(this.ewRam, 0, this.ewRam.Length);
-            Array.Clear(this.iwRam, 0, this.iwRam.Length);
-            Array.Clear(this.ioReg, 0, this.ioReg.Length);
-            Array.Clear(this.VideoRam, 0, this.VideoRam.Length);
-            Array.Clear(this.PaletteRam, 0, this.PaletteRam.Length);
-            Array.Clear(this.OamRam, 0, this.OamRam.Length);
-            Array.Clear(this.sRam, 0, this.sRam.Length);
+            Array.Clear(ewRam, 0, ewRam.Length);
+            Array.Clear(iwRam, 0, iwRam.Length);
+            Array.Clear(ioReg, 0, ioReg.Length);
+            Array.Clear(VideoRam, 0, VideoRam.Length);
+            Array.Clear(PaletteRam, 0, PaletteRam.Length);
+            Array.Clear(OamRam, 0, OamRam.Length);
+            Array.Clear(sRam, 0, sRam.Length);
 
-            Memory.WriteU16(this.ioReg, Memory.BG2PA, 0x0100);
-            Memory.WriteU16(this.ioReg, Memory.BG2PD, 0x0100);
-            Memory.WriteU16(this.ioReg, Memory.BG3PA, 0x0100);
-            Memory.WriteU16(this.ioReg, Memory.BG3PD, 0x0100);
+            WriteU16(ioReg, BG2PA, 0x0100);
+            WriteU16(ioReg, BG2PD, 0x0100);
+            WriteU16(ioReg, BG3PA, 0x0100);
+            WriteU16(ioReg, BG3PD, 0x0100);
         }
 
         public void HBlankDma()
         {
-            for (int i = 0; i < 4; i++)
+            for (var i = 0; i < 4; i++)
             {
-                if (((this.dmaRegs[i, 3] >> 12) & 0x3) == 2)
+                if (((dmaRegs[i, 3] >> 12) & 0x3) == 2)
                 {
-                    this.DmaTransfer(i);
+                    DmaTransfer(i);
                 }
             }
         }
 
         public void VBlankDma()
         {
-            for (int i = 0; i < 4; i++)
+            for (var i = 0; i < 4; i++)
             {
-                if (((this.dmaRegs[i, 3] >> 12) & 0x3) == 1)
+                if (((dmaRegs[i, 3] >> 12) & 0x3) == 1)
                 {
-                    this.DmaTransfer(i);
+                    DmaTransfer(i);
                 }
             }
         }
 
         public void FifoDma(int channel)
         {
-            if (((this.dmaRegs[channel, 3] >> 12) & 0x3) == 0x3)
+            if (((dmaRegs[channel, 3] >> 12) & 0x3) == 0x3)
             {
-                this.DmaTransfer(channel);
+                DmaTransfer(channel);
             }
         }
 
         public void DmaTransfer(int channel)
         {
             // Check if DMA is enabled
-            if ((this.dmaRegs[channel, 3] & (1 << 15)) != 0)
+            if ((dmaRegs[channel, 3] & (1 << 15)) != 0)
             {
-                bool wideTransfer = (this.dmaRegs[channel, 3] & (1 << 10)) != 0;
+                var wideTransfer = (dmaRegs[channel, 3] & (1 << 10)) != 0;
 
                 uint srcDirection = 0, destDirection = 0;
-                bool reload = false;
+                var reload = false;
 
-                switch ((this.dmaRegs[channel, 3] >> 5) & 0x3)
+                switch ((dmaRegs[channel, 3] >> 5) & 0x3)
                 {
                     case 0: destDirection = 1; break;
                     case 1: destDirection = 0xFFFFFFFF; break;
@@ -365,7 +366,7 @@ namespace GarboDev.CrossCutting
                     case 3: destDirection = 1; reload = true;  break;
                 }
 
-                switch ((this.dmaRegs[channel, 3] >> 7) & 0x3)
+                switch ((dmaRegs[channel, 3] >> 7) & 0x3)
                 {
                     case 0: srcDirection = 1; break;
                     case 1: srcDirection = 0xFFFFFFFF; break;
@@ -378,10 +379,10 @@ namespace GarboDev.CrossCutting
                         throw new Exception("Unhandled DMA mode.");
                 }
 
-                int numElements = (int)this.dmaRegs[channel, 2];
+                var numElements = (int)dmaRegs[channel, 2];
                 if (numElements == 0) numElements = 0x4000;
 
-                if (((this.dmaRegs[channel, 3] >> 12) & 0x3) == 0x3)
+                if (((dmaRegs[channel, 3] >> 12) & 0x3) == 0x3)
                 {
                     // Sound FIFO mode
                     wideTransfer = true;
@@ -396,9 +397,9 @@ namespace GarboDev.CrossCutting
                     destDirection *= 4;
                     while (numElements-- > 0)
                     {
-                        this.WriteU32(this.dmaRegs[channel, 1], this.ReadU32(this.dmaRegs[channel, 0]));
-                        this.dmaRegs[channel, 1] += destDirection;
-                        this.dmaRegs[channel, 0] += srcDirection;
+                        WriteU32(dmaRegs[channel, 1], ReadU32(dmaRegs[channel, 0]));
+                        dmaRegs[channel, 1] += destDirection;
+                        dmaRegs[channel, 0] += srcDirection;
                     }
                 }
                 else
@@ -407,16 +408,16 @@ namespace GarboDev.CrossCutting
                     destDirection *= 2;
                     while (numElements-- > 0)
                     {
-                        this.WriteU16(this.dmaRegs[channel, 1], this.ReadU16(this.dmaRegs[channel, 0]));
-                        this.dmaRegs[channel, 1] += destDirection;
-                        this.dmaRegs[channel, 0] += srcDirection;
+                        WriteU16(dmaRegs[channel, 1], ReadU16(dmaRegs[channel, 0]));
+                        dmaRegs[channel, 1] += destDirection;
+                        dmaRegs[channel, 0] += srcDirection;
                     }
                 }
 
                 // If not a repeating DMA, then disable the DMA
-                if ((this.dmaRegs[channel, 3] & (1 << 9)) == 0)
+                if ((dmaRegs[channel, 3] & (1 << 9)) == 0)
                 {
-                    this.dmaRegs[channel, 3] &= 0x7FFF;
+                    dmaRegs[channel, 3] &= 0x7FFF;
                 }
                 else
                 {
@@ -424,27 +425,27 @@ namespace GarboDev.CrossCutting
                     switch (channel)
                     {
                         case 0:
-                            if (reload) this.dmaRegs[0, 1] = Memory.ReadU32(this.ioReg, Memory.DMA0DAD) & 0x07FFFFFF;
-                            this.dmaRegs[0, 2] = Memory.ReadU16(this.ioReg, Memory.DMA0CNT_L);
+                            if (reload) dmaRegs[0, 1] = ReadU32(ioReg, DMA0DAD) & 0x07FFFFFF;
+                            dmaRegs[0, 2] = ReadU16(ioReg, DMA0CNT_L);
                             break;
                         case 1:
-                            if (reload) this.dmaRegs[1, 1] = Memory.ReadU32(this.ioReg, Memory.DMA1DAD) & 0x07FFFFFF;
-                            this.dmaRegs[1, 2] = Memory.ReadU16(this.ioReg, Memory.DMA1CNT_L);
+                            if (reload) dmaRegs[1, 1] = ReadU32(ioReg, DMA1DAD) & 0x07FFFFFF;
+                            dmaRegs[1, 2] = ReadU16(ioReg, DMA1CNT_L);
                             break;
                         case 2:
-                            if (reload) this.dmaRegs[2, 1] = Memory.ReadU32(this.ioReg, Memory.DMA2DAD) & 0x07FFFFFF;
-                            this.dmaRegs[2, 2] = Memory.ReadU16(this.ioReg, Memory.DMA2CNT_L);
+                            if (reload) dmaRegs[2, 1] = ReadU32(ioReg, DMA2DAD) & 0x07FFFFFF;
+                            dmaRegs[2, 2] = ReadU16(ioReg, DMA2CNT_L);
                             break;
                         case 3:
-                            if (reload) this.dmaRegs[3, 1] = Memory.ReadU32(this.ioReg, Memory.DMA3DAD) & 0x0FFFFFFF;
-                            this.dmaRegs[3, 2] = Memory.ReadU16(this.ioReg, Memory.DMA3CNT_L);
+                            if (reload) dmaRegs[3, 1] = ReadU32(ioReg, DMA3DAD) & 0x0FFFFFFF;
+                            dmaRegs[3, 2] = ReadU16(ioReg, DMA3CNT_L);
                             break;
                     }
                 }
 
-                if ((this.dmaRegs[channel, 3] & (1 << 14)) != 0)
+                if ((dmaRegs[channel, 3] & (1 << 14)) != 0)
                 {
-                    this.RequestProcessorIrq(8 + channel);
+                    RequestProcessorIrq(8 + channel);
                 }
             }
         }
@@ -454,41 +455,41 @@ namespace GarboDev.CrossCutting
             switch (channel)
             {
                 case 0:
-                    if (((this.dmaRegs[0, 3] ^ Memory.ReadU16(this.ioReg, Memory.DMA0CNT_H)) & (1 << 15)) == 0) return;
-                    this.dmaRegs[0, 0] = Memory.ReadU32(this.ioReg, Memory.DMA0SAD) & 0x07FFFFFF;
-                    this.dmaRegs[0, 1] = Memory.ReadU32(this.ioReg, Memory.DMA0DAD) & 0x07FFFFFF;
-                    this.dmaRegs[0, 2] = Memory.ReadU16(this.ioReg, Memory.DMA0CNT_L);
-                    this.dmaRegs[0, 3] = Memory.ReadU16(this.ioReg, Memory.DMA0CNT_H);
+                    if (((dmaRegs[0, 3] ^ ReadU16(ioReg, DMA0CNT_H)) & (1 << 15)) == 0) return;
+                    dmaRegs[0, 0] = ReadU32(ioReg, DMA0SAD) & 0x07FFFFFF;
+                    dmaRegs[0, 1] = ReadU32(ioReg, DMA0DAD) & 0x07FFFFFF;
+                    dmaRegs[0, 2] = ReadU16(ioReg, DMA0CNT_L);
+                    dmaRegs[0, 3] = ReadU16(ioReg, DMA0CNT_H);
                     break;
                 case 1:
-                    if (((this.dmaRegs[1, 3] ^ Memory.ReadU16(this.ioReg, Memory.DMA1CNT_H)) & (1 << 15)) == 0) return;
-                    this.dmaRegs[1, 0] = Memory.ReadU32(this.ioReg, Memory.DMA1SAD) & 0x0FFFFFFF;
-                    this.dmaRegs[1, 1] = Memory.ReadU32(this.ioReg, Memory.DMA1DAD) & 0x07FFFFFF;
-                    this.dmaRegs[1, 2] = Memory.ReadU16(this.ioReg, Memory.DMA1CNT_L);
-                    this.dmaRegs[1, 3] = Memory.ReadU16(this.ioReg, Memory.DMA1CNT_H);
+                    if (((dmaRegs[1, 3] ^ ReadU16(ioReg, DMA1CNT_H)) & (1 << 15)) == 0) return;
+                    dmaRegs[1, 0] = ReadU32(ioReg, DMA1SAD) & 0x0FFFFFFF;
+                    dmaRegs[1, 1] = ReadU32(ioReg, DMA1DAD) & 0x07FFFFFF;
+                    dmaRegs[1, 2] = ReadU16(ioReg, DMA1CNT_L);
+                    dmaRegs[1, 3] = ReadU16(ioReg, DMA1CNT_H);
                     break;
                 case 2:
-                    if (((this.dmaRegs[2, 3] ^ Memory.ReadU16(this.ioReg, Memory.DMA2CNT_H)) & (1 << 15)) == 0) return;
-                    this.dmaRegs[2, 0] = Memory.ReadU32(this.ioReg, Memory.DMA2SAD) & 0x0FFFFFFF;
-                    this.dmaRegs[2, 1] = Memory.ReadU32(this.ioReg, Memory.DMA2DAD) & 0x07FFFFFF;
-                    this.dmaRegs[2, 2] = Memory.ReadU16(this.ioReg, Memory.DMA2CNT_L);
-                    this.dmaRegs[2, 3] = Memory.ReadU16(this.ioReg, Memory.DMA2CNT_H);
+                    if (((dmaRegs[2, 3] ^ ReadU16(ioReg, DMA2CNT_H)) & (1 << 15)) == 0) return;
+                    dmaRegs[2, 0] = ReadU32(ioReg, DMA2SAD) & 0x0FFFFFFF;
+                    dmaRegs[2, 1] = ReadU32(ioReg, DMA2DAD) & 0x07FFFFFF;
+                    dmaRegs[2, 2] = ReadU16(ioReg, DMA2CNT_L);
+                    dmaRegs[2, 3] = ReadU16(ioReg, DMA2CNT_H);
                     break;
                 case 3:
-                    if (((this.dmaRegs[3, 3] ^ Memory.ReadU16(this.ioReg, Memory.DMA3CNT_H)) & (1 << 15)) == 0) return;
-                    this.dmaRegs[3, 0] = Memory.ReadU32(this.ioReg, Memory.DMA3SAD) & 0x0FFFFFFF;
-                    this.dmaRegs[3, 1] = Memory.ReadU32(this.ioReg, Memory.DMA3DAD) & 0x0FFFFFFF;
-                    this.dmaRegs[3, 2] = Memory.ReadU16(this.ioReg, Memory.DMA3CNT_L);
-                    this.dmaRegs[3, 3] = Memory.ReadU16(this.ioReg, Memory.DMA3CNT_H);
+                    if (((dmaRegs[3, 3] ^ ReadU16(ioReg, DMA3CNT_H)) & (1 << 15)) == 0) return;
+                    dmaRegs[3, 0] = ReadU32(ioReg, DMA3SAD) & 0x0FFFFFFF;
+                    dmaRegs[3, 1] = ReadU32(ioReg, DMA3DAD) & 0x0FFFFFFF;
+                    dmaRegs[3, 2] = ReadU16(ioReg, DMA3CNT_L);
+                    dmaRegs[3, 3] = ReadU16(ioReg, DMA3CNT_H);
                     break;
             }
 
             // Channel start timing
-            switch ((this.dmaRegs[channel, 3] >> 12) & 0x3)
+            switch ((dmaRegs[channel, 3] >> 12) & 0x3)
             {
                 case 0:
                     // Start immediately
-                    this.DmaTransfer(channel);
+                    DmaTransfer(channel);
                     break;
                 case 1:
                 case 2:
@@ -502,12 +503,12 @@ namespace GarboDev.CrossCutting
 
         private void WriteTimerControl(int timer, ushort newCnt)
         {
-            ushort control = Memory.ReadU16(this.ioReg, Memory.TM0CNT + (uint)(timer * 4));
-            uint count = Memory.ReadU16(this.ioReg, Memory.TM0D + (uint)(timer * 4));
+            var control = ReadU16(ioReg, TM0CNT + (uint)(timer * 4));
+            uint count = ReadU16(ioReg, TM0D + (uint)(timer * 4));
 
             if ((newCnt & (1 << 7)) != 0 && (control & (1 << 7)) == 0)
             {
-                this.timerCnt[timer] = count << 10;
+                timerCnt[timer] = count << 10;
             }
         }
 
@@ -541,346 +542,346 @@ namespace GarboDev.CrossCutting
         #region Memory Reads
         private uint ReadUnreadable()
         {
-            if (this.inUnreadable)
+            if (_inUnreadable)
             {
                 return 0;
             }
 
-            this.inUnreadable = true;
+            _inUnreadable = true;
 
             uint res;
 
-            if (this.ArmProcessorState())
+            if (ArmProcessorState())
             {
-                res = this.ReadU32(this.GetProcessorRegister15());
+                res = ReadU32(GetProcessorRegister15());
             }
             else
             {
-                ushort val = this.ReadU16(this.GetProcessorRegister15());
+                var val = ReadU16(GetProcessorRegister15());
                 res = (uint)(val | (val << 16));
             }
 
-            this.inUnreadable = false;
+            _inUnreadable = false;
 
             return res;
         }
 
         private byte ReadNop8(uint address)
         {
-            return (byte)(this.ReadUnreadable() & 0xFF);
+            return (byte)(ReadUnreadable() & 0xFF);
         }
 
         private ushort ReadNop16(uint address)
         {
-            return (ushort)(this.ReadUnreadable() & 0xFFFF);
+            return (ushort)(ReadUnreadable() & 0xFFFF);
         }
 
         private uint ReadNop32(uint address)
         {
-            return this.ReadUnreadable();
+            return ReadUnreadable();
         }
 
         private byte ReadBiosRam8(uint address)
         {
-            this.waitCycles++;
-            if (this.GetProcessorRegister15() < 0x01000000)
+            _waitCycles++;
+            if (GetProcessorRegister15() < 0x01000000)
             {
-                return this.biosRam[address & Memory.biosRamMask];
+                return biosRam[address & biosRamMask];
             }
-            return (byte)(this.ReadUnreadable() & 0xFF);
+            return (byte)(ReadUnreadable() & 0xFF);
         }
 
         private ushort ReadBiosRam16(uint address)
         {
-            this.waitCycles++;
-            if (this.GetProcessorRegister15() < 0x01000000)
+            _waitCycles++;
+            if (GetProcessorRegister15() < 0x01000000)
             {
-                return Memory.ReadU16(this.biosRam, address & Memory.biosRamMask);
+                return ReadU16(biosRam, address & biosRamMask);
             }
-            return (ushort)(this.ReadUnreadable() & 0xFFFF);
+            return (ushort)(ReadUnreadable() & 0xFFFF);
         }
 
         private uint ReadBiosRam32(uint address)
         {
-            this.waitCycles++;
-            if (this.GetProcessorRegister15() < 0x01000000)
+            _waitCycles++;
+            if (GetProcessorRegister15() < 0x01000000)
             {
-                return Memory.ReadU32(this.biosRam, address & Memory.biosRamMask);
+                return ReadU32(biosRam, address & biosRamMask);
             }
-            return this.ReadUnreadable();
+            return ReadUnreadable();
         }
 
         private byte ReadEwRam8(uint address)
         {
-            this.waitCycles += 3;
-            return this.ewRam[address & Memory.ewRamMask];
+            _waitCycles += 3;
+            return ewRam[address & ewRamMask];
         }
 
         private ushort ReadEwRam16(uint address)
         {
-            this.waitCycles += 3;
-            return Memory.ReadU16(this.ewRam, address & Memory.ewRamMask);
+            _waitCycles += 3;
+            return ReadU16(ewRam, address & ewRamMask);
         }
 
         private uint ReadEwRam32(uint address)
         {
-            this.waitCycles += 6;
-            return Memory.ReadU32(this.ewRam, address & Memory.ewRamMask);
+            _waitCycles += 6;
+            return ReadU32(ewRam, address & ewRamMask);
         }
 
         private byte ReadIwRam8(uint address)
         {
-            this.waitCycles++;
-            return this.iwRam[address & Memory.iwRamMask];
+            _waitCycles++;
+            return iwRam[address & iwRamMask];
         }
 
         private ushort ReadIwRam16(uint address)
         {
-            this.waitCycles++;
-            return Memory.ReadU16(this.iwRam, address & Memory.iwRamMask);
+            _waitCycles++;
+            return ReadU16(iwRam, address & iwRamMask);
         }
 
         private uint ReadIwRam32(uint address)
         {
-            this.waitCycles++;
-            return Memory.ReadU32(this.iwRam, address & Memory.iwRamMask);
+            _waitCycles++;
+            return ReadU32(iwRam, address & iwRamMask);
         }
 
         private byte ReadIO8(uint address)
         {
-            this.waitCycles++;
+            _waitCycles++;
             address &= 0xFFFFFF;
-            if (address >= Memory.ioRegMask) return 0;
+            if (address >= ioRegMask) return 0;
 
             switch (address)
             {
                 case KEYINPUT:
-                    return (byte)(this.KeyState & 0xFF);
+                    return (byte)(KeyState & 0xFF);
                 case KEYINPUT + 1:
-                    return (byte)(this.KeyState >> 8);
+                    return (byte)(KeyState >> 8);
 
                 case DMA0CNT_H:
-                    return (byte)(this.dmaRegs[0, 3] & 0xFF);
+                    return (byte)(dmaRegs[0, 3] & 0xFF);
                 case DMA0CNT_H + 1:
-                    return (byte)(this.dmaRegs[0, 3] >> 8);
+                    return (byte)(dmaRegs[0, 3] >> 8);
                 case DMA1CNT_H:
-                    return (byte)(this.dmaRegs[1, 3] & 0xFF);
+                    return (byte)(dmaRegs[1, 3] & 0xFF);
                 case DMA1CNT_H + 1:
-                    return (byte)(this.dmaRegs[1, 3] >> 8);
+                    return (byte)(dmaRegs[1, 3] >> 8);
                 case DMA2CNT_H:
-                    return (byte)(this.dmaRegs[2, 3] & 0xFF);
+                    return (byte)(dmaRegs[2, 3] & 0xFF);
                 case DMA2CNT_H + 1:
-                    return (byte)(this.dmaRegs[2, 3] >> 8);
+                    return (byte)(dmaRegs[2, 3] >> 8);
                 case DMA3CNT_H:
-                    return (byte)(this.dmaRegs[3, 3] & 0xFF);
+                    return (byte)(dmaRegs[3, 3] & 0xFF);
                 case DMA3CNT_H + 1:
-                    return (byte)(this.dmaRegs[3, 3] >> 8);
+                    return (byte)(dmaRegs[3, 3] >> 8);
 
                 case TM0D:
-                    this.UpdateProcessorTimers();
-                    return (byte)((this.timerCnt[0] >> 10) & 0xFF);
+                    UpdateProcessorTimers();
+                    return (byte)((timerCnt[0] >> 10) & 0xFF);
                 case TM0D + 1:
-                    this.UpdateProcessorTimers();
-                    return (byte)((this.timerCnt[0] >> 10) >> 8);
+                    UpdateProcessorTimers();
+                    return (byte)((timerCnt[0] >> 10) >> 8);
                 case TM1D:
-                    this.UpdateProcessorTimers();
-                    return (byte)((this.timerCnt[1] >> 10) & 0xFF);
+                    UpdateProcessorTimers();
+                    return (byte)((timerCnt[1] >> 10) & 0xFF);
                 case TM1D + 1:
-                    this.UpdateProcessorTimers();
-                    return (byte)((this.timerCnt[1] >> 10) >> 8);
+                    UpdateProcessorTimers();
+                    return (byte)((timerCnt[1] >> 10) >> 8);
                 case TM2D:
-                    this.UpdateProcessorTimers();
-                    return (byte)((this.timerCnt[2] >> 10) & 0xFF);
+                    UpdateProcessorTimers();
+                    return (byte)((timerCnt[2] >> 10) & 0xFF);
                 case TM2D + 1:
-                    this.UpdateProcessorTimers();
-                    return (byte)((this.timerCnt[2] >> 10) >> 8);
+                    UpdateProcessorTimers();
+                    return (byte)((timerCnt[2] >> 10) >> 8);
                 case TM3D:
-                    this.UpdateProcessorTimers();
-                    return (byte)((this.timerCnt[3] >> 10) & 0xFF);
+                    UpdateProcessorTimers();
+                    return (byte)((timerCnt[3] >> 10) & 0xFF);
                 case TM3D + 1:
-                    this.UpdateProcessorTimers();
-                    return (byte)((this.timerCnt[3] >> 10) >> 8);
+                    UpdateProcessorTimers();
+                    return (byte)((timerCnt[3] >> 10) >> 8);
 
                 default:
-                    return this.ioReg[address];
+                    return ioReg[address];
             }
         }
 
         private ushort ReadIO16(uint address)
         {
-            this.waitCycles++;
+            _waitCycles++;
             address &= 0xFFFFFF;
-            if (address >= Memory.ioRegMask) return 0;
+            if (address >= ioRegMask) return 0;
 
             switch (address)
             {
                 case KEYINPUT:
-                    return this.KeyState;
+                    return KeyState;
 
                 case DMA0CNT_H:
-                    return (ushort)this.dmaRegs[0, 3];
+                    return (ushort)dmaRegs[0, 3];
                 case DMA1CNT_H:
-                    return (ushort)this.dmaRegs[1, 3];
+                    return (ushort)dmaRegs[1, 3];
                 case DMA2CNT_H:
-                    return (ushort)this.dmaRegs[2, 3];
+                    return (ushort)dmaRegs[2, 3];
                 case DMA3CNT_H:
-                    return (ushort)this.dmaRegs[3, 3];
+                    return (ushort)dmaRegs[3, 3];
 
                 case TM0D:
-                    this.UpdateProcessorTimers();
-                    return (ushort)((this.timerCnt[0] >> 10) & 0xFFFF);
+                    UpdateProcessorTimers();
+                    return (ushort)((timerCnt[0] >> 10) & 0xFFFF);
                 case TM1D:
-                    this.UpdateProcessorTimers();
-                    return (ushort)((this.timerCnt[1] >> 10) & 0xFFFF);
+                    UpdateProcessorTimers();
+                    return (ushort)((timerCnt[1] >> 10) & 0xFFFF);
                 case TM2D:
-                    this.UpdateProcessorTimers();
-                    return (ushort)((this.timerCnt[2] >> 10) & 0xFFFF);
+                    UpdateProcessorTimers();
+                    return (ushort)((timerCnt[2] >> 10) & 0xFFFF);
                 case TM3D:
-                    this.UpdateProcessorTimers();
-                    return (ushort)((this.timerCnt[3] >> 10) & 0xFFFF);
+                    UpdateProcessorTimers();
+                    return (ushort)((timerCnt[3] >> 10) & 0xFFFF);
 
                 default:
-                    return Memory.ReadU16(this.ioReg, address);
+                    return ReadU16(ioReg, address);
             }
         }
 
         private uint ReadIO32(uint address)
         {
-            this.waitCycles++;
+            _waitCycles++;
             address &= 0xFFFFFF;
-            if (address >= Memory.ioRegMask) return 0;
+            if (address >= ioRegMask) return 0;
 
             switch (address)
             {
                 case KEYINPUT:
-                    return this.KeyState | ((uint)Memory.ReadU16(this.ioReg, address + 0x2) << 16);
+                    return KeyState | ((uint)ReadU16(ioReg, address + 0x2) << 16);
 
                 case DMA0CNT_L:
-                    return (uint)Memory.ReadU16(this.ioReg, address) | (this.dmaRegs[0, 3] << 16);
+                    return ReadU16(ioReg, address) | (dmaRegs[0, 3] << 16);
                 case DMA1CNT_L:
-                    return (uint)Memory.ReadU16(this.ioReg, address) | (this.dmaRegs[1, 3] << 16);
+                    return ReadU16(ioReg, address) | (dmaRegs[1, 3] << 16);
                 case DMA2CNT_L:
-                    return (uint)Memory.ReadU16(this.ioReg, address) | (this.dmaRegs[2, 3] << 16);
+                    return ReadU16(ioReg, address) | (dmaRegs[2, 3] << 16);
                 case DMA3CNT_L:
-                    return (uint)Memory.ReadU16(this.ioReg, address) | (this.dmaRegs[3, 3] << 16);
+                    return ReadU16(ioReg, address) | (dmaRegs[3, 3] << 16);
 
                 case TM0D:
-                    this.UpdateProcessorTimers();
-                    return (uint)(((this.timerCnt[0] >> 10) & 0xFFFF) | (uint)(Memory.ReadU16(this.ioReg, address + 2) << 16));
+                    UpdateProcessorTimers();
+                    return ((timerCnt[0] >> 10) & 0xFFFF) | (uint)(ReadU16(ioReg, address + 2) << 16);
                 case TM1D:
-                    this.UpdateProcessorTimers();
-                    return (uint)(((this.timerCnt[1] >> 10) & 0xFFFF) | (uint)(Memory.ReadU16(this.ioReg, address + 2) << 16));
+                    UpdateProcessorTimers();
+                    return ((timerCnt[1] >> 10) & 0xFFFF) | (uint)(ReadU16(ioReg, address + 2) << 16);
                 case TM2D:
-                    this.UpdateProcessorTimers();
-                    return (uint)(((this.timerCnt[2] >> 10) & 0xFFFF) | (uint)(Memory.ReadU16(this.ioReg, address + 2) << 16));
+                    UpdateProcessorTimers();
+                    return ((timerCnt[2] >> 10) & 0xFFFF) | (uint)(ReadU16(ioReg, address + 2) << 16);
                 case TM3D:
-                    this.UpdateProcessorTimers();
-                    return (uint)(((this.timerCnt[3] >> 10) & 0xFFFF) | (uint)(Memory.ReadU16(this.ioReg, address + 2) << 16));
+                    UpdateProcessorTimers();
+                    return ((timerCnt[3] >> 10) & 0xFFFF) | (uint)(ReadU16(ioReg, address + 2) << 16);
 
                 default:
-                    return Memory.ReadU32(this.ioReg, address);
+                    return ReadU32(ioReg, address);
             }
         }
 
         private byte ReadPalRam8(uint address)
         {
-            this.waitCycles++;
-            return this.PaletteRam[address & Memory.palRamMask];
+            _waitCycles++;
+            return PaletteRam[address & palRamMask];
         }
 
         private ushort ReadPalRam16(uint address)
         {
-            this.waitCycles++;
-            return Memory.ReadU16(this.PaletteRam, address & Memory.palRamMask);
+            _waitCycles++;
+            return ReadU16(PaletteRam, address & palRamMask);
         }
 
         private uint ReadPalRam32(uint address)
         {
-            this.waitCycles += 2;
-            return Memory.ReadU32(this.PaletteRam, address & Memory.palRamMask);
+            _waitCycles += 2;
+            return ReadU32(PaletteRam, address & palRamMask);
         }
 
         private byte ReadVRam8(uint address)
         {
-            this.waitCycles++;
-            address &= Memory.vRamMask;
+            _waitCycles++;
+            address &= vRamMask;
             if (address > 0x17FFF) address = 0x10000 + ((address - 0x17FFF) & 0x7FFF);
-            return this.VideoRam[address];
+            return VideoRam[address];
         }
 
         private ushort ReadVRam16(uint address)
         {
-            this.waitCycles++;
-            address &= Memory.vRamMask;
+            _waitCycles++;
+            address &= vRamMask;
             if (address > 0x17FFF) address = 0x10000 + ((address - 0x17FFF) & 0x7FFF);
-            return Memory.ReadU16(this.VideoRam, address);
+            return ReadU16(VideoRam, address);
         }
 
         private uint ReadVRam32(uint address)
         {
-            this.waitCycles += 2;
-            address &= Memory.vRamMask;
+            _waitCycles += 2;
+            address &= vRamMask;
             if (address > 0x17FFF) address = 0x10000 + ((address - 0x17FFF) & 0x7FFF);
-            return Memory.ReadU32(this.VideoRam, address & Memory.vRamMask);
+            return ReadU32(VideoRam, address & vRamMask);
         }
 
         private byte ReadOamRam8(uint address)
         {
-            this.waitCycles++;
-            return this.OamRam[address & Memory.oamRamMask];
+            _waitCycles++;
+            return OamRam[address & oamRamMask];
         }
 
         private ushort ReadOamRam16(uint address)
         {
-            this.waitCycles++;
-            return Memory.ReadU16(this.OamRam, address & Memory.oamRamMask);
+            _waitCycles++;
+            return ReadU16(OamRam, address & oamRamMask);
         }
 
         private uint ReadOamRam32(uint address)
         {
-            this.waitCycles++;
-            return Memory.ReadU32(this.OamRam, address & Memory.oamRamMask);
+            _waitCycles++;
+            return ReadU32(OamRam, address & oamRamMask);
         }
 
         private byte ReadRom1_8(uint address)
         {
-            this.waitCycles += this.bankSTimes[(address >> 24) & 0xf];
-            return this.romBank1[address & this.romBank1Mask];
+            _waitCycles += bankSTimes[(address >> 24) & 0xf];
+            return romBank1[address & romBank1Mask];
         }
 
         private ushort ReadRom1_16(uint address)
         {
-            this.waitCycles += this.bankSTimes[(address >> 24) & 0xf];
-            return Memory.ReadU16(this.romBank1, address & this.romBank1Mask);
+            _waitCycles += bankSTimes[(address >> 24) & 0xf];
+            return ReadU16(romBank1, address & romBank1Mask);
         }
 
         private uint ReadRom1_32(uint address)
         {
-            this.waitCycles += this.bankSTimes[(address >> 24) & 0xf] * 2 + 1;
-            return Memory.ReadU32(this.romBank1, address & this.romBank1Mask);
+            _waitCycles += bankSTimes[(address >> 24) & 0xf] * 2 + 1;
+            return ReadU32(romBank1, address & romBank1Mask);
         }
 
         private byte ReadRom2_8(uint address)
         {
-            this.waitCycles += this.bankSTimes[(address >> 24) & 0xf];
-            return this.romBank2[address & this.romBank2Mask];
+            _waitCycles += bankSTimes[(address >> 24) & 0xf];
+            return romBank2[address & romBank2Mask];
         }
 
         private ushort ReadRom2_16(uint address)
         {
-            this.waitCycles += this.bankSTimes[(address >> 24) & 0xf];
-            return Memory.ReadU16(this.romBank2, address & this.romBank2Mask);
+            _waitCycles += bankSTimes[(address >> 24) & 0xf];
+            return ReadU16(romBank2, address & romBank2Mask);
         }
 
         private uint ReadRom2_32(uint address)
         {
-            this.waitCycles += this.bankSTimes[(address >> 24) & 0xf] * 2 + 1;
-            return Memory.ReadU32(this.romBank2, address & this.romBank2Mask);
+            _waitCycles += bankSTimes[(address >> 24) & 0xf] * 2 + 1;
+            return ReadU32(romBank2, address & romBank2Mask);
         }
 
         private byte ReadSRam8(uint address)
         {
-            return this.sRam[address & Memory.sRamMask];
+            return sRam[address & sRamMask];
         }
 
         private ushort ReadSRam16(uint address)
@@ -911,45 +912,45 @@ namespace GarboDev.CrossCutting
 
         private void WriteEwRam8(uint address, byte value)
         {
-            this.waitCycles += 3;
-            this.ewRam[address & Memory.ewRamMask] = value;
+            _waitCycles += 3;
+            ewRam[address & ewRamMask] = value;
         }
 
         private void WriteEwRam16(uint address, ushort value)
         {
-            this.waitCycles += 3;
-            Memory.WriteU16(this.ewRam, address & Memory.ewRamMask, value);
+            _waitCycles += 3;
+            WriteU16(ewRam, address & ewRamMask, value);
         }
 
         private void WriteEwRam32(uint address, uint value)
         {
-            this.waitCycles += 6;
-            Memory.WriteU32(this.ewRam, address & Memory.ewRamMask, value);
+            _waitCycles += 6;
+            WriteU32(ewRam, address & ewRamMask, value);
         }
 
         private void WriteIwRam8(uint address, byte value)
         {
-            this.waitCycles++;
-            this.iwRam[address & Memory.iwRamMask] = value;
+            _waitCycles++;
+            iwRam[address & iwRamMask] = value;
         }
 
         private void WriteIwRam16(uint address, ushort value)
         {
-            this.waitCycles++;
-            Memory.WriteU16(this.iwRam, address & Memory.iwRamMask, value);
+            _waitCycles++;
+            WriteU16(iwRam, address & iwRamMask, value);
         }
 
         private void WriteIwRam32(uint address, uint value)
         {
-            this.waitCycles++;
-            Memory.WriteU32(this.iwRam, address & Memory.iwRamMask, value);
+            _waitCycles++;
+            WriteU32(iwRam, address & iwRamMask, value);
         }
 
         private void WriteIO8(uint address, byte value)
         {
-            this.waitCycles++;
+            _waitCycles++;
             address &= 0xFFFFFF;
-            if (address >= Memory.ioRegMask) return;
+            if (address >= ioRegMask) return;
 
             switch (address)
             {
@@ -958,12 +959,12 @@ namespace GarboDev.CrossCutting
                 case BG2X_L + 2:
                 case BG2X_L + 3:
                     {
-                        this.ioReg[address] = value;
-                        uint tmp = Memory.ReadU32(this.ioReg, BG2X_L);
+                        ioReg[address] = value;
+                        var tmp = ReadU32(ioReg, BG2X_L);
                         if ((tmp & (1 << 27)) != 0) tmp |= 0xF0000000;
-                        Memory.WriteU32(this.ioReg, BG2X_L, tmp);
+                        WriteU32(ioReg, BG2X_L, tmp);
 
-                        this.bgx[0] = (int)tmp;
+                        bgx[0] = (int)tmp;
                     }
                     break;
 
@@ -972,12 +973,12 @@ namespace GarboDev.CrossCutting
                 case BG3X_L + 2:
                 case BG3X_L + 3:
                     {
-                        this.ioReg[address] = value;
-                        uint tmp = Memory.ReadU32(this.ioReg, BG3X_L);
+                        ioReg[address] = value;
+                        var tmp = ReadU32(ioReg, BG3X_L);
                         if ((tmp & (1 << 27)) != 0) tmp |= 0xF0000000;
-                        Memory.WriteU32(this.ioReg, BG3X_L, tmp);
+                        WriteU32(ioReg, BG3X_L, tmp);
 
-                        this.bgx[1] = (int)tmp;
+                        bgx[1] = (int)tmp;
                     }
                     break;
 
@@ -986,12 +987,12 @@ namespace GarboDev.CrossCutting
                 case BG2Y_L + 2:
                 case BG2Y_L + 3:
                     {
-                        this.ioReg[address] = value;
-                        uint tmp = Memory.ReadU32(this.ioReg, BG2Y_L);
+                        ioReg[address] = value;
+                        var tmp = ReadU32(ioReg, BG2Y_L);
                         if ((tmp & (1 << 27)) != 0) tmp |= 0xF0000000;
-                        Memory.WriteU32(this.ioReg, BG2Y_L, tmp);
+                        WriteU32(ioReg, BG2Y_L, tmp);
 
-                        this.bgy[0] = (int)tmp;
+                        bgy[0] = (int)tmp;
                     }
                     break;
 
@@ -1000,72 +1001,72 @@ namespace GarboDev.CrossCutting
                 case BG3Y_L + 2:
                 case BG3Y_L + 3:
                     {
-                        this.ioReg[address] = value;
-                        uint tmp = Memory.ReadU32(this.ioReg, BG3Y_L);
+                        ioReg[address] = value;
+                        var tmp = ReadU32(ioReg, BG3Y_L);
                         if ((tmp & (1 << 27)) != 0) tmp |= 0xF0000000;
-                        Memory.WriteU32(this.ioReg, BG3Y_L, tmp);
+                        WriteU32(ioReg, BG3Y_L, tmp);
 
-                        this.bgy[1] = (int)tmp;
+                        bgy[1] = (int)tmp;
                     }
                     break;
 
                 case DMA0CNT_H:
                 case DMA0CNT_H + 1:
-                    this.ioReg[address] = value;
-                    this.WriteDmaControl(0);
+                    ioReg[address] = value;
+                    WriteDmaControl(0);
                     break;
 
                 case DMA1CNT_H:
                 case DMA1CNT_H + 1:
-                    this.ioReg[address] = value;
-                    this.WriteDmaControl(1);
+                    ioReg[address] = value;
+                    WriteDmaControl(1);
                     break;
 
                 case DMA2CNT_H:
                 case DMA2CNT_H + 1:
-                    this.ioReg[address] = value;
-                    this.WriteDmaControl(2);
+                    ioReg[address] = value;
+                    WriteDmaControl(2);
                     break;
 
                 case DMA3CNT_H:
                 case DMA3CNT_H + 1:
-                    this.ioReg[address] = value;
-                    this.WriteDmaControl(3);
+                    ioReg[address] = value;
+                    WriteDmaControl(3);
                     break;
 
                 case TM0CNT:
                 case TM0CNT + 1:
                     {
-                        ushort oldCnt = Memory.ReadU16(this.ioReg, TM0CNT);
-                        this.ioReg[address] = value;
-                        this.WriteTimerControl(0, oldCnt);
+                        var oldCnt = ReadU16(ioReg, TM0CNT);
+                        ioReg[address] = value;
+                        WriteTimerControl(0, oldCnt);
                     }
                     break;
 
                 case TM1CNT:
                 case TM1CNT + 1:
                     {
-                        ushort oldCnt = Memory.ReadU16(this.ioReg, TM1CNT);
-                        this.ioReg[address] = value;
-                        this.WriteTimerControl(1, oldCnt);
+                        var oldCnt = ReadU16(ioReg, TM1CNT);
+                        ioReg[address] = value;
+                        WriteTimerControl(1, oldCnt);
                     }
                     break;
 
                 case TM2CNT:
                 case TM2CNT + 1:
                     {
-                        ushort oldCnt = Memory.ReadU16(this.ioReg, TM2CNT);
-                        this.ioReg[address] = value;
-                        this.WriteTimerControl(2, oldCnt);
+                        var oldCnt = ReadU16(ioReg, TM2CNT);
+                        ioReg[address] = value;
+                        WriteTimerControl(2, oldCnt);
                     }
                     break;
 
                 case TM3CNT:
                 case TM3CNT + 1:
                     {
-                        ushort oldCnt = Memory.ReadU16(this.ioReg, TM3CNT);
-                        this.ioReg[address] = value;
-                        this.WriteTimerControl(3, oldCnt);
+                        var oldCnt = ReadU16(ioReg, TM3CNT);
+                        ioReg[address] = value;
+                        WriteTimerControl(3, oldCnt);
                     }
                     break;
 
@@ -1073,397 +1074,397 @@ namespace GarboDev.CrossCutting
                 case FIFO_A_L+1:
                 case FIFO_A_H:
                 case FIFO_A_H+1:
-                    this.ioReg[address] = value;
-                    this.IncrementSoundFifoA();
+                    ioReg[address] = value;
+                    IncrementSoundFifoA();
                     break;
 
                 case FIFO_B_L:
                 case FIFO_B_L + 1:
                 case FIFO_B_H:
                 case FIFO_B_H + 1:
-                    this.ioReg[address] = value;
-                    this.IncrementSoundFifoB();
+                    ioReg[address] = value;
+                    IncrementSoundFifoB();
                     break;
 
                 case IF:
                 case IF + 1:
-                    this.ioReg[address] &= (byte)~value;
+                    ioReg[address] &= (byte)~value;
                     break;
 
                 case HALTCNT + 1:
-                    this.ioReg[address] = value;
-                    this.HaltProcessor();
+                    ioReg[address] = value;
+                    HaltProcessor();
                     break;
 
                 default:
-                    this.ioReg[address] = value;
+                    ioReg[address] = value;
                     break;
             }
         }
 
         private void WriteIO16(uint address, ushort value)
         {
-            this.waitCycles++;
+            _waitCycles++;
             address &= 0xFFFFFF;
-            if (address >= Memory.ioRegMask) return;
+            if (address >= ioRegMask) return;
 
             switch (address)
             {
                 case BG2X_L:
                 case BG2X_L + 2:
                     {
-                        Memory.WriteU16(this.ioReg, address, value);
-                        uint tmp = Memory.ReadU32(this.ioReg, BG2X_L);
+                        WriteU16(ioReg, address, value);
+                        var tmp = ReadU32(ioReg, BG2X_L);
                         if ((tmp & (1 << 27)) != 0) tmp |= 0xF0000000;
-                        Memory.WriteU32(this.ioReg, BG2X_L, tmp);
+                        WriteU32(ioReg, BG2X_L, tmp);
 
-                        this.bgx[0] = (int)tmp;
+                        bgx[0] = (int)tmp;
                     }
                     break;
 
                 case BG3X_L:
                 case BG3X_L + 2:
                     {
-                        Memory.WriteU16(this.ioReg, address, value);
-                        uint tmp = Memory.ReadU32(this.ioReg, BG3X_L);
+                        WriteU16(ioReg, address, value);
+                        var tmp = ReadU32(ioReg, BG3X_L);
                         if ((tmp & (1 << 27)) != 0) tmp |= 0xF0000000;
-                        Memory.WriteU32(this.ioReg, BG3X_L, tmp);
+                        WriteU32(ioReg, BG3X_L, tmp);
 
-                        this.bgx[1] = (int)tmp;
+                        bgx[1] = (int)tmp;
                     }
                     break;
 
                 case BG2Y_L:
                 case BG2Y_L + 2:
                     {
-                        Memory.WriteU16(this.ioReg, address, value);
-                        uint tmp = Memory.ReadU32(this.ioReg, BG2Y_L);
+                        WriteU16(ioReg, address, value);
+                        var tmp = ReadU32(ioReg, BG2Y_L);
                         if ((tmp & (1 << 27)) != 0) tmp |= 0xF0000000;
-                        Memory.WriteU32(this.ioReg, BG2Y_L, tmp);
+                        WriteU32(ioReg, BG2Y_L, tmp);
 
-                        this.bgy[0] = (int)tmp;
+                        bgy[0] = (int)tmp;
                     }
                     break;
 
                 case BG3Y_L:
                 case BG3Y_L + 2:
                     {
-                        Memory.WriteU16(this.ioReg, address, value);
-                        uint tmp = Memory.ReadU32(this.ioReg, BG3Y_L);
+                        WriteU16(ioReg, address, value);
+                        var tmp = ReadU32(ioReg, BG3Y_L);
                         if ((tmp & (1 << 27)) != 0) tmp |= 0xF0000000;
-                        Memory.WriteU32(this.ioReg, BG3Y_L, tmp);
+                        WriteU32(ioReg, BG3Y_L, tmp);
 
-                        this.bgy[1] = (int)tmp;
+                        bgy[1] = (int)tmp;
                     }
                     break;
 
                 case DMA0CNT_H:
-                    Memory.WriteU16(this.ioReg, address, value);
-                    this.WriteDmaControl(0);
+                    WriteU16(ioReg, address, value);
+                    WriteDmaControl(0);
                     break;
 
                 case DMA1CNT_H:
-                    Memory.WriteU16(this.ioReg, address, value);
-                    this.WriteDmaControl(1);
+                    WriteU16(ioReg, address, value);
+                    WriteDmaControl(1);
                     break;
 
                 case DMA2CNT_H:
-                    Memory.WriteU16(this.ioReg, address, value);
-                    this.WriteDmaControl(2);
+                    WriteU16(ioReg, address, value);
+                    WriteDmaControl(2);
                     break;
 
                 case DMA3CNT_H:
-                    Memory.WriteU16(this.ioReg, address, value);
-                    this.WriteDmaControl(3);
+                    WriteU16(ioReg, address, value);
+                    WriteDmaControl(3);
                     break;
 
                 case TM0CNT:
                     {
-                        ushort oldCnt = Memory.ReadU16(this.ioReg, TM0CNT);
-                        Memory.WriteU16(this.ioReg, address, value);
-                        this.WriteTimerControl(0, oldCnt);
+                        var oldCnt = ReadU16(ioReg, TM0CNT);
+                        WriteU16(ioReg, address, value);
+                        WriteTimerControl(0, oldCnt);
                     }
                     break;
 
                 case TM1CNT:
                     {
-                        ushort oldCnt = Memory.ReadU16(this.ioReg, TM1CNT);
-                        Memory.WriteU16(this.ioReg, address, value);
-                        this.WriteTimerControl(1, oldCnt);
+                        var oldCnt = ReadU16(ioReg, TM1CNT);
+                        WriteU16(ioReg, address, value);
+                        WriteTimerControl(1, oldCnt);
                     }
                     break;
 
                 case TM2CNT:
                     {
-                        ushort oldCnt = Memory.ReadU16(this.ioReg, TM2CNT);
-                        Memory.WriteU16(this.ioReg, address, value);
-                        this.WriteTimerControl(2, oldCnt);
+                        var oldCnt = ReadU16(ioReg, TM2CNT);
+                        WriteU16(ioReg, address, value);
+                        WriteTimerControl(2, oldCnt);
                     }
                     break;
 
                 case TM3CNT:
                     {
-                        ushort oldCnt = Memory.ReadU16(this.ioReg, TM3CNT);
-                        Memory.WriteU16(this.ioReg, address, value);
-                        this.WriteTimerControl(3, oldCnt);
+                        var oldCnt = ReadU16(ioReg, TM3CNT);
+                        WriteU16(ioReg, address, value);
+                        WriteTimerControl(3, oldCnt);
                     }
                     break;
 
                 case FIFO_A_L:
                 case FIFO_A_H:
-                    Memory.WriteU16(this.ioReg, address, value);
-                    this.IncrementSoundFifoA();
+                    WriteU16(ioReg, address, value);
+                    IncrementSoundFifoA();
                     break;
 
                 case FIFO_B_L:
                 case FIFO_B_H:
-                    Memory.WriteU16(this.ioReg, address, value);
-                    this.IncrementSoundFifoB();
+                    WriteU16(ioReg, address, value);
+                    IncrementSoundFifoB();
                     break;
 
                 case SOUNDCNT_H:
-                    Memory.WriteU16(this.ioReg, address, value);
+                    WriteU16(ioReg, address, value);
                     if ((value & (1 << 11)) != 0)
                     {
-                        this.ResetSoundFifoA();
+                        ResetSoundFifoA();
                     }
                     if ((value & (1 << 15)) != 0)
                     {
-                        this.ResetSoundFifoB();
+                        ResetSoundFifoB();
                     }
                     break;
 
                 case IF:
                     {
-                        ushort tmp = Memory.ReadU16(this.ioReg, address);
-                        Memory.WriteU16(this.ioReg, address, (ushort)(tmp & (~value)));
+                        var tmp = ReadU16(ioReg, address);
+                        WriteU16(ioReg, address, (ushort)(tmp & (~value)));
                     }
                     break;
 
                 case HALTCNT:
-                    Memory.WriteU16(this.ioReg, address, value);
-                    this.HaltProcessor();
+                    WriteU16(ioReg, address, value);
+                    HaltProcessor();
                     break;
 
                 default:
-                    Memory.WriteU16(this.ioReg, address, value);
+                    WriteU16(ioReg, address, value);
                     break;
             }
         }
 
         private void WriteIO32(uint address, uint value)
         {
-            this.waitCycles++;
+            _waitCycles++;
             address &= 0xFFFFFF;
-            if (address >= Memory.ioRegMask) return;
+            if (address >= ioRegMask) return;
 
             switch (address)
             {
                 case BG2X_L:
                     {
-                        Memory.WriteU32(this.ioReg, address, value);
-                        uint tmp = Memory.ReadU32(this.ioReg, BG2X_L);
+                        WriteU32(ioReg, address, value);
+                        var tmp = ReadU32(ioReg, BG2X_L);
                         if ((tmp & (1 << 27)) != 0) tmp |= 0xF0000000;
-                        Memory.WriteU32(this.ioReg, BG2X_L, tmp);
+                        WriteU32(ioReg, BG2X_L, tmp);
 
-                        this.bgx[0] = (int)tmp;
+                        bgx[0] = (int)tmp;
                     }
                     break;
 
                 case BG3X_L:
                     {
-                        Memory.WriteU32(this.ioReg, address, value);
-                        uint tmp = Memory.ReadU32(this.ioReg, BG3X_L);
+                        WriteU32(ioReg, address, value);
+                        var tmp = ReadU32(ioReg, BG3X_L);
                         if ((tmp & (1 << 27)) != 0) tmp |= 0xF0000000;
-                        Memory.WriteU32(this.ioReg, BG3X_L, tmp);
+                        WriteU32(ioReg, BG3X_L, tmp);
 
-                        this.bgx[1] = (int)tmp;
+                        bgx[1] = (int)tmp;
                     }
                     break;
 
                 case BG2Y_L:
                     {
-                        Memory.WriteU32(this.ioReg, address, value);
-                        uint tmp = Memory.ReadU32(this.ioReg, BG2Y_L);
+                        WriteU32(ioReg, address, value);
+                        var tmp = ReadU32(ioReg, BG2Y_L);
                         if ((tmp & (1 << 27)) != 0) tmp |= 0xF0000000;
-                        Memory.WriteU32(this.ioReg, BG2Y_L, tmp);
+                        WriteU32(ioReg, BG2Y_L, tmp);
 
-                        this.bgy[0] = (int)tmp;
+                        bgy[0] = (int)tmp;
                     }
                     break;
 
                 case BG3Y_L:
                     {
-                        Memory.WriteU32(this.ioReg, address, value);
-                        uint tmp = Memory.ReadU32(this.ioReg, BG3Y_L);
+                        WriteU32(ioReg, address, value);
+                        var tmp = ReadU32(ioReg, BG3Y_L);
                         if ((tmp & (1 << 27)) != 0) tmp |= 0xF0000000;
-                        Memory.WriteU32(this.ioReg, BG3Y_L, tmp);
+                        WriteU32(ioReg, BG3Y_L, tmp);
 
-                        this.bgy[1] = (int)tmp;
+                        bgy[1] = (int)tmp;
                     }
                     break;
 
                 case DMA0CNT_L:
-                    Memory.WriteU32(this.ioReg, address, value);
-                    this.WriteDmaControl(0);
+                    WriteU32(ioReg, address, value);
+                    WriteDmaControl(0);
                     break;
 
                 case DMA1CNT_L:
-                    Memory.WriteU32(this.ioReg, address, value);
-                    this.WriteDmaControl(1);
+                    WriteU32(ioReg, address, value);
+                    WriteDmaControl(1);
                     break;
 
                 case DMA2CNT_L:
-                    Memory.WriteU32(this.ioReg, address, value);
-                    this.WriteDmaControl(2);
+                    WriteU32(ioReg, address, value);
+                    WriteDmaControl(2);
                     break;
 
                 case DMA3CNT_L:
-                    Memory.WriteU32(this.ioReg, address, value);
-                    this.WriteDmaControl(3);
+                    WriteU32(ioReg, address, value);
+                    WriteDmaControl(3);
                     break;
 
                 case TM0D:
                     {
-                        ushort oldCnt = Memory.ReadU16(this.ioReg, TM0CNT);
-                        Memory.WriteU32(this.ioReg, address, value);
-                        this.WriteTimerControl(0, oldCnt);
+                        var oldCnt = ReadU16(ioReg, TM0CNT);
+                        WriteU32(ioReg, address, value);
+                        WriteTimerControl(0, oldCnt);
                     }
                     break;
 
                 case TM1D:
                     {
-                        ushort oldCnt = Memory.ReadU16(this.ioReg, TM1CNT);
-                        Memory.WriteU32(this.ioReg, address, value);
-                        this.WriteTimerControl(1, oldCnt);
+                        var oldCnt = ReadU16(ioReg, TM1CNT);
+                        WriteU32(ioReg, address, value);
+                        WriteTimerControl(1, oldCnt);
                     }
                     break;
 
                 case TM2D:
                     {
-                        ushort oldCnt = Memory.ReadU16(this.ioReg, TM2CNT);
-                        Memory.WriteU32(this.ioReg, address, value);
-                        this.WriteTimerControl(2, oldCnt);
+                        var oldCnt = ReadU16(ioReg, TM2CNT);
+                        WriteU32(ioReg, address, value);
+                        WriteTimerControl(2, oldCnt);
                     }
                     break;
 
                 case TM3D:
                     {
-                        ushort oldCnt = Memory.ReadU16(this.ioReg, TM3CNT);
-                        Memory.WriteU32(this.ioReg, address, value);
-                        this.WriteTimerControl(3, oldCnt);
+                        var oldCnt = ReadU16(ioReg, TM3CNT);
+                        WriteU32(ioReg, address, value);
+                        WriteTimerControl(3, oldCnt);
                     }
                     break;
 
                 case FIFO_A_L:
-                    Memory.WriteU32(this.ioReg, address, value);
-                    this.IncrementSoundFifoA();
+                    WriteU32(ioReg, address, value);
+                    IncrementSoundFifoA();
                     break;
 
                 case FIFO_B_L:
-                    Memory.WriteU32(this.ioReg, address, value);
-                    this.IncrementSoundFifoB();
+                    WriteU32(ioReg, address, value);
+                    IncrementSoundFifoB();
                     break;
 
                 case SOUNDCNT_L:
-                    Memory.WriteU32(this.ioReg, address, value);
+                    WriteU32(ioReg, address, value);
                     if (((value >> 16) & (1 << 11)) != 0)
                     {
-                        this.ResetSoundFifoA();
+                        ResetSoundFifoA();
                     }
                     if (((value >> 16) & (1 << 15)) != 0)
                     {
-                        this.ResetSoundFifoB();
+                        ResetSoundFifoB();
                     }
                     break;
 
                 case IE:
                     {
-                        uint tmp = Memory.ReadU32(this.ioReg, address);
-                        Memory.WriteU32(this.ioReg, address, (uint)((value & 0xFFFF) | (tmp & (~(value & 0xFFFF0000)))));
+                        var tmp = ReadU32(ioReg, address);
+                        WriteU32(ioReg, address, (value & 0xFFFF) | (tmp & (~(value & 0xFFFF0000))));
                     }
                     break;
 
                 case HALTCNT:
-                    Memory.WriteU32(this.ioReg, address, value);
-                    this.HaltProcessor();
+                    WriteU32(ioReg, address, value);
+                    HaltProcessor();
                     break;
 
                 default:
-                    Memory.WriteU32(this.ioReg, address, value);
+                    WriteU32(ioReg, address, value);
                     break;
             }
         }
 
         private void WritePalRam8(uint address, byte value)
         {
-            this.waitCycles++;
-            address &= Memory.palRamMask & ~1U;
-            this.PaletteRam[address] = value;
-            this.PaletteRam[address + 1] = value;
+            _waitCycles++;
+            address &= palRamMask & ~1U;
+            PaletteRam[address] = value;
+            PaletteRam[address + 1] = value;
         }
 
         private void WritePalRam16(uint address, ushort value)
         {
-            this.waitCycles++;
-            Memory.WriteU16(this.PaletteRam, address & Memory.palRamMask, value);
+            _waitCycles++;
+            WriteU16(PaletteRam, address & palRamMask, value);
         }
 
         private void WritePalRam32(uint address, uint value)
         {
-            this.waitCycles += 2;
-            Memory.WriteU32(this.PaletteRam, address & Memory.palRamMask, value);
+            _waitCycles += 2;
+            WriteU32(PaletteRam, address & palRamMask, value);
         }
 
         private void WriteVRam8(uint address, byte value)
         {
-            this.waitCycles++;
-            address &= Memory.vRamMask & ~1U;
+            _waitCycles++;
+            address &= vRamMask & ~1U;
             if (address > 0x17FFF) address = 0x10000 + ((address - 0x17FFF) & 0x7FFF);
-            this.VideoRam[address] = value;
-            this.VideoRam[address + 1] = value;
+            VideoRam[address] = value;
+            VideoRam[address + 1] = value;
         }
 
         private void WriteVRam16(uint address, ushort value)
         {
-            this.waitCycles++;
-            address &= Memory.vRamMask;
+            _waitCycles++;
+            address &= vRamMask;
             if (address > 0x17FFF) address = 0x10000 + ((address - 0x17FFF) & 0x7FFF);
-            Memory.WriteU16(this.VideoRam, address, value);
+            WriteU16(VideoRam, address, value);
         }
 
         private void WriteVRam32(uint address, uint value)
         {
-            this.waitCycles += 2;
-            address &= Memory.vRamMask;
+            _waitCycles += 2;
+            address &= vRamMask;
             if (address > 0x17FFF) address = 0x10000 + ((address - 0x17FFF) & 0x7FFF);
-            Memory.WriteU32(this.VideoRam, address, value);
+            WriteU32(VideoRam, address, value);
         }
 
         private void WriteOamRam8(uint address, byte value)
         {
-            this.waitCycles++;
-            address &= Memory.oamRamMask & ~1U;
+            _waitCycles++;
+            address &= oamRamMask & ~1U;
 
-            this.OamRam[address] = value;
-            this.OamRam[address + 1] = value;
+            OamRam[address] = value;
+            OamRam[address + 1] = value;
         }
 
         private void WriteOamRam16(uint address, ushort value)
         {
-            this.waitCycles++;
-            Memory.WriteU16(this.OamRam, address & Memory.oamRamMask, value);
+            _waitCycles++;
+            WriteU16(OamRam, address & oamRamMask, value);
         }
 
         private void WriteOamRam32(uint address, uint value)
         {
-            this.waitCycles++;
-            Memory.WriteU32(this.OamRam, address & Memory.oamRamMask, value);
+            _waitCycles++;
+            WriteU32(OamRam, address & oamRamMask, value);
         }
 
         private void WriteSRam8(uint address, byte value)
         {
-            this.sRam[address & Memory.sRamMask] = value;
+            sRam[address & sRamMask] = value;
         }
 
         private void WriteSRam16(uint address, ushort value)
@@ -1483,100 +1484,100 @@ namespace GarboDev.CrossCutting
         }
 
         private EepromModes eepromMode = EepromModes.Idle;
-        private byte[] eeprom = new byte[0xffff];
-        private byte[] eepromStore = new byte[0xff];
+        private readonly byte[] eeprom = new byte[0xffff];
+        private readonly byte[] eepromStore = new byte[0xff];
         private int curEepromByte;
         private int eepromReadAddress = -1;
 
         private void WriteEeprom8(uint address, byte value)
         {
             // EEPROM writes must be done by DMA 3
-            if ((this.dmaRegs[3, 3] & (1 << 15)) == 0) return;
+            if ((dmaRegs[3, 3] & (1 << 15)) == 0) return;
             // 0 length eeprom writes are bad
-            if (this.dmaRegs[3, 2] == 0) return;
+            if (dmaRegs[3, 2] == 0) return;
 
-            if (this.eepromMode != EepromModes.ReadData)
+            if (eepromMode != EepromModes.ReadData)
             {
-                this.curEepromByte = 0;
-                this.eepromMode = EepromModes.ReadData;
-                this.eepromReadAddress = -1;
+                curEepromByte = 0;
+                eepromMode = EepromModes.ReadData;
+                eepromReadAddress = -1;
 
-                for (int i = 0; i < this.eepromStore.Length; i++) this.eepromStore[i] = 0;
+                for (var i = 0; i < eepromStore.Length; i++) eepromStore[i] = 0;
             }
 
-            this.eepromStore[this.curEepromByte >> 3] |= (byte)(value << (7 - (this.curEepromByte & 0x7)));
-            this.curEepromByte++;
+            eepromStore[curEepromByte >> 3] |= (byte)(value << (7 - (curEepromByte & 0x7)));
+            curEepromByte++;
 
-            if (this.curEepromByte == this.dmaRegs[3, 2])
+            if (curEepromByte == dmaRegs[3, 2])
             {
-                if ((this.eepromStore[0] & 0x80) == 0) return;
+                if ((eepromStore[0] & 0x80) == 0) return;
 
-                if ((this.eepromStore[0] & 0x40) != 0)
+                if ((eepromStore[0] & 0x40) != 0)
                 {
                     // Read request
-                    if (this.curEepromByte == 9)
+                    if (curEepromByte == 9)
                     {
-                        this.eepromReadAddress = this.eepromStore[0] & 0x3F;
+                        eepromReadAddress = eepromStore[0] & 0x3F;
                     }
                     else
                     {
-                        this.eepromReadAddress = ((this.eepromStore[0] & 0x3F) << 8) | this.eepromStore[1];
+                        eepromReadAddress = ((eepromStore[0] & 0x3F) << 8) | eepromStore[1];
                     }
                     
-                    this.curEepromByte = 0;
+                    curEepromByte = 0;
                 }
                 else
                 {
                     // Write request
                     int eepromAddress, offset;
-                    if (this.curEepromByte == 64 + 9)
+                    if (curEepromByte == 64 + 9)
                     {
-                        eepromAddress = (int)(this.eepromStore[0] & 0x3F);
+                        eepromAddress = eepromStore[0] & 0x3F;
                         offset = 1;
                     }
                     else
                     {
-                        eepromAddress = ((this.eepromStore[0] & 0x3F) << 8) | this.eepromStore[1];
+                        eepromAddress = ((eepromStore[0] & 0x3F) << 8) | eepromStore[1];
                         offset = 2;
                     }
 
-                    for (int i = 0; i < 8; i++)
+                    for (var i = 0; i < 8; i++)
                     {
-                        this.eeprom[eepromAddress * 8 + i] = this.eepromStore[i + offset];
+                        eeprom[eepromAddress * 8 + i] = eepromStore[i + offset];
                     }
 
-                    this.eepromMode = EepromModes.Idle;
+                    eepromMode = EepromModes.Idle;
                 }
             }
         }
 
         private void WriteEeprom16(uint address, ushort value)
         {
-            this.WriteEeprom8(address, (byte)(value & 0xff));
+            WriteEeprom8(address, (byte)(value & 0xff));
         }
 
         private void WriteEeprom32(uint address, uint value)
         {
-            this.WriteEeprom8(address, (byte)(value & 0xff));
+            WriteEeprom8(address, (byte)(value & 0xff));
         }
 
         private byte ReadEeprom8(uint address)
         {
-            if (this.eepromReadAddress == -1) return 1;
+            if (eepromReadAddress == -1) return 1;
 
             byte retval = 0;
 
-            if (this.curEepromByte >= 4)
+            if (curEepromByte >= 4)
             {
-                retval = (byte)((this.eeprom[this.eepromReadAddress * 8 + ((this.curEepromByte - 4) / 8)] >> (7 - ((this.curEepromByte - 4) & 7))) & 1);
+                retval = (byte)((eeprom[eepromReadAddress * 8 + ((curEepromByte - 4) / 8)] >> (7 - ((curEepromByte - 4) & 7))) & 1);
             }
 
-            this.curEepromByte++;
+            curEepromByte++;
 
-            if (this.curEepromByte == this.dmaRegs[3, 2])
+            if (curEepromByte == dmaRegs[3, 2])
             {
-                this.eepromReadAddress = -1;
-                this.eepromMode = EepromModes.Idle;
+                eepromReadAddress = -1;
+                eepromMode = EepromModes.Idle;
             }
 
             return retval;
@@ -1584,12 +1585,12 @@ namespace GarboDev.CrossCutting
 
         private ushort ReadEeprom16(uint address)
         {
-            return (ushort)this.ReadEeprom8(address);
+            return ReadEeprom8(address);
         }
 
         private uint ReadEeprom32(uint address)
         {
-            return (uint)this.ReadEeprom8(address);
+            return ReadEeprom8(address);
         }
         #endregion
 
@@ -1598,19 +1599,19 @@ namespace GarboDev.CrossCutting
         private List<uint> palUpdated = new List<uint>();
         public const int VramBlockSize = 64;
         public const int PalBlockSize = 32;
-        private bool[] vramHit = new bool[(Memory.vRamMask + 1) / VramBlockSize];
-        private bool[] palHit = new bool[(Memory.palRamMask + 1) / PalBlockSize];
+        private readonly bool[] vramHit = new bool[(vRamMask + 1) / VramBlockSize];
+        private readonly bool[] palHit = new bool[(palRamMask + 1) / PalBlockSize];
 
         public List<uint> VramUpdated
         {
             get
             {
-                List<uint> old = this.vramUpdated;
-                for (int i = 0; i < old.Count; i++)
+                var old = vramUpdated;
+                for (var i = 0; i < old.Count; i++)
                 {
                     vramHit[old[i]] = false;
                 }
-                this.vramUpdated = new List<uint>();
+                vramUpdated = new List<uint>();
                 return old;
             }
         }
@@ -1620,221 +1621,221 @@ namespace GarboDev.CrossCutting
         {
             get
             {
-                List<uint> old = this.palUpdated;
-                for (int i = 0; i < old.Count; i++)
+                var old = palUpdated;
+                for (var i = 0; i < old.Count; i++)
                 {
                     palHit[old[i]] = false;
                 }
-                this.palUpdated = new List<uint>();
+                palUpdated = new List<uint>();
                 return old;
             }
         }
 
         private void UpdatePal(uint address)
         {
-            uint index = address / PalBlockSize;
+            var index = address / PalBlockSize;
             if (!palHit[index])
             {
                 palHit[index] = true;
-                this.palUpdated.Add(index);
+                palUpdated.Add(index);
             }
         }
 
         private void UpdateVram(uint address)
         {
-            uint index = address / VramBlockSize;
+            var index = address / VramBlockSize;
             if (!vramHit[index])
             {
                 vramHit[index] = true;
-                this.vramUpdated.Add(index);
+                vramUpdated.Add(index);
             }
         }
 
         private void ShaderWritePalRam8(uint address, byte value)
         {
-            this.waitCycles++;
-            address &= Memory.palRamMask & ~1U;
-            this.PaletteRam[address] = value;
-            this.PaletteRam[address + 1] = value;
+            _waitCycles++;
+            address &= palRamMask & ~1U;
+            PaletteRam[address] = value;
+            PaletteRam[address + 1] = value;
 
-            this.UpdatePal(address);
+            UpdatePal(address);
         }
 
         private void ShaderWritePalRam16(uint address, ushort value)
         {
-            this.waitCycles++;
-            Memory.WriteU16(this.PaletteRam, address & Memory.palRamMask, value);
+            _waitCycles++;
+            WriteU16(PaletteRam, address & palRamMask, value);
 
-            this.UpdatePal(address & Memory.palRamMask);
+            UpdatePal(address & palRamMask);
         }
 
         private void ShaderWritePalRam32(uint address, uint value)
         {
-            this.waitCycles += 2;
-            Memory.WriteU32(this.PaletteRam, address & Memory.palRamMask, value);
+            _waitCycles += 2;
+            WriteU32(PaletteRam, address & palRamMask, value);
 
-            this.UpdatePal(address & Memory.palRamMask);
+            UpdatePal(address & palRamMask);
         }
 
         private void ShaderWriteVRam8(uint address, byte value)
         {
-            this.waitCycles++;
-            address &= Memory.vRamMask & ~1U;
+            _waitCycles++;
+            address &= vRamMask & ~1U;
             if (address > 0x17FFF) address = 0x10000 + ((address - 0x17FFF) & 0x7FFF);
-            this.VideoRam[address] = value;
-            this.VideoRam[address + 1] = value;
+            VideoRam[address] = value;
+            VideoRam[address + 1] = value;
             
-            this.UpdateVram(address);
+            UpdateVram(address);
         }
 
         private void ShaderWriteVRam16(uint address, ushort value)
         {
-            this.waitCycles++;
-            address &= Memory.vRamMask;
+            _waitCycles++;
+            address &= vRamMask;
             if (address > 0x17FFF) address = 0x10000 + ((address - 0x17FFF) & 0x7FFF);
-            Memory.WriteU16(this.VideoRam, address, value);
+            WriteU16(VideoRam, address, value);
 
-            this.UpdateVram(address);
+            UpdateVram(address);
         }
 
         private void ShaderWriteVRam32(uint address, uint value)
         {
-            this.waitCycles += 2;
-            address &= Memory.vRamMask;
+            _waitCycles += 2;
+            address &= vRamMask;
             if (address > 0x17FFF) address = 0x10000 + ((address - 0x17FFF) & 0x7FFF);
-            Memory.WriteU32(this.VideoRam, address, value);
+            WriteU32(VideoRam, address, value);
 
-            this.UpdateVram(address);
+            UpdateVram(address);
         }
 
         public void EnableVramUpdating()
         {
-            this.WriteU8Funcs[0x5] = this.ShaderWritePalRam8;
-            this.WriteU16Funcs[0x5] = this.ShaderWritePalRam16;
-            this.WriteU32Funcs[0x5] = this.ShaderWritePalRam32;
-            this.WriteU8Funcs[0x6] = this.ShaderWriteVRam8;
-            this.WriteU16Funcs[0x6] = this.ShaderWriteVRam16;
-            this.WriteU32Funcs[0x6] = this.ShaderWriteVRam32;
+            WriteU8Funcs[0x5] = ShaderWritePalRam8;
+            WriteU16Funcs[0x5] = ShaderWritePalRam16;
+            WriteU32Funcs[0x5] = ShaderWritePalRam32;
+            WriteU8Funcs[0x6] = ShaderWriteVRam8;
+            WriteU16Funcs[0x6] = ShaderWriteVRam16;
+            WriteU32Funcs[0x6] = ShaderWriteVRam32;
 
-            for (uint i = 0; i < (Memory.vRamMask + 1) / Memory.VramBlockSize; i++)
+            for (uint i = 0; i < (vRamMask + 1) / VramBlockSize; i++)
             {
-                this.vramUpdated.Add(i);
+                vramUpdated.Add(i);
             }
 
-            for (uint i = 0; i < (Memory.palRamMask + 1) / Memory.PalBlockSize; i++)
+            for (uint i = 0; i < (palRamMask + 1) / PalBlockSize; i++)
             {
-                this.palUpdated.Add(i);
+                palUpdated.Add(i);
             }
         }
         #endregion
 
         public byte ReadU8(uint address)
         {
-            uint bank = (address >> 24) & 0xf;
-            return this.ReadU8Funcs[bank](address);
+            var bank = (address >> 24) & 0xf;
+            return ReadU8Funcs[bank](address);
         }
 
         public ushort ReadU16(uint address)
         {
             address &= ~1U;
-            uint bank = (address >> 24) & 0xf;
-            return this.ReadU16Funcs[bank](address);
+            var bank = (address >> 24) & 0xf;
+            return ReadU16Funcs[bank](address);
         }
 
         public uint ReadU32(uint address)
         {
-            int shiftAmt = (int)((address & 3U) << 3);
+            var shiftAmt = (int)((address & 3U) << 3);
             address &= ~3U;
-            uint bank = (address >> 24) & 0xf;
-            uint res = this.ReadU32Funcs[bank](address);
+            var bank = (address >> 24) & 0xf;
+            var res = ReadU32Funcs[bank](address);
             return (res >> shiftAmt) | (res << (32 - shiftAmt));
         }
 
         public uint ReadU32Aligned(uint address)
         {
-            uint bank = (address >> 24) & 0xf;
-            return this.ReadU32Funcs[bank](address);
+            var bank = (address >> 24) & 0xf;
+            return ReadU32Funcs[bank](address);
         }
 
         public ushort ReadU16Debug(uint address)
         {
             address &= ~1U;
-            uint bank = (address >> 24) & 0xf;
-            int oldWaitCycles = this.waitCycles;
-            ushort res = this.ReadU16Funcs[bank](address);
-            this.waitCycles = oldWaitCycles;
+            var bank = (address >> 24) & 0xf;
+            var oldWaitCycles = _waitCycles;
+            var res = ReadU16Funcs[bank](address);
+            _waitCycles = oldWaitCycles;
             return res;
         }
 
         public uint ReadU32Debug(uint address)
         {
-            int shiftAmt = (int)((address & 3U) << 3);
+            var shiftAmt = (int)((address & 3U) << 3);
             address &= ~3U;
-            uint bank = (address >> 24) & 0xf;
-            int oldWaitCycles = this.waitCycles;
-            uint res = this.ReadU32Funcs[bank](address);
-            this.waitCycles = oldWaitCycles;
+            var bank = (address >> 24) & 0xf;
+            var oldWaitCycles = _waitCycles;
+            var res = ReadU32Funcs[bank](address);
+            _waitCycles = oldWaitCycles;
             return (res >> shiftAmt) | (res << (32 - shiftAmt));
         }
 
         public void WriteU8(uint address, byte value)
         {
-            uint bank = (address >> 24) & 0xf;
-            this.WriteU8Funcs[bank](address, value);
+            var bank = (address >> 24) & 0xf;
+            WriteU8Funcs[bank](address, value);
         }
 
         public void WriteU16(uint address, ushort value)
         {
             address &= ~1U;
-            uint bank = (address >> 24) & 0xf;
-            this.WriteU16Funcs[bank](address, value);
+            var bank = (address >> 24) & 0xf;
+            WriteU16Funcs[bank](address, value);
         }
 
         public void WriteU32(uint address, uint value)
         {
             address &= ~3U;
-            uint bank = (address >> 24) & 0xf;
-            this.WriteU32Funcs[bank](address, value);
+            var bank = (address >> 24) & 0xf;
+            WriteU32Funcs[bank](address, value);
         }
 
         public void WriteU8Debug(uint address, byte value)
         {
-            uint bank = (address >> 24) & 0xf;
-            int oldWaitCycles = this.waitCycles;
-            this.WriteU8Funcs[bank](address, value);
-            this.waitCycles = oldWaitCycles;
+            var bank = (address >> 24) & 0xf;
+            var oldWaitCycles = _waitCycles;
+            WriteU8Funcs[bank](address, value);
+            _waitCycles = oldWaitCycles;
         }
 
         public void WriteU16Debug(uint address, ushort value)
         {
             address &= ~1U;
-            uint bank = (address >> 24) & 0xf;
-            int oldWaitCycles = this.waitCycles;
-            this.WriteU16Funcs[bank](address, value);
-            this.waitCycles = oldWaitCycles;
+            var bank = (address >> 24) & 0xf;
+            var oldWaitCycles = _waitCycles;
+            WriteU16Funcs[bank](address, value);
+            _waitCycles = oldWaitCycles;
         }
 
         public void WriteU32Debug(uint address, uint value)
         {
             address &= ~3U;
-            uint bank = (address >> 24) & 0xf;
-            int oldWaitCycles = this.waitCycles;
-            this.WriteU32Funcs[bank](address, value);
-            this.waitCycles = oldWaitCycles;
+            var bank = (address >> 24) & 0xf;
+            var oldWaitCycles = _waitCycles;
+            WriteU32Funcs[bank](address, value);
+            _waitCycles = oldWaitCycles;
         }
 
         public void LoadBios(byte[] biosRom)
         {
-            Array.Copy(biosRom, this.biosRam, this.biosRam.Length);
+            Array.Copy(biosRom, biosRam, biosRam.Length);
         }
 
         public void LoadCartridge(byte[] cartRom)
         {
-            this.ResetRomBank1();
-            this.ResetRomBank2();
+            ResetRomBank1();
+            ResetRomBank2();
 
             // Set up the appropriate cart size
-            int cartSize = 1;
+            var cartSize = 1;
             while (cartSize < cartRom.Length)
             {
                 cartSize <<= 1;
@@ -1848,91 +1849,91 @@ namespace GarboDev.CrossCutting
             // Split across bank 1 and 2 if cart is too big
             if (cartSize > 1 << 24)
             {
-                this.romBank1 = cartRom;
-                this.romBank1Mask = (1 << 24) - 1;
+                romBank1 = cartRom;
+                romBank1Mask = (1 << 24) - 1;
 
-                cartRom.CopyTo(this.romBank2, 1 << 24);
-                this.romBank2Mask = (1 << 24) - 1;
+                cartRom.CopyTo(romBank2, 1 << 24);
+                romBank2Mask = (1 << 24) - 1;
             }
             else
             {
-                this.romBank1 = cartRom;
-                this.romBank1Mask = (uint)(cartSize - 1);
+                romBank1 = cartRom;
+                romBank1Mask = (uint)(cartSize - 1);
             }
 
-            if (this.romBank1Mask != 0)
+            if (romBank1Mask != 0)
             {
                 // TODO: Writes (i.e. eeprom, and other stuff)
-                this.ReadU8Funcs[0x8] = this.ReadRom1_8;
-                this.ReadU8Funcs[0xA] = this.ReadRom1_8;
-                this.ReadU8Funcs[0xC] = this.ReadRom1_8;
-                this.ReadU16Funcs[0x8] = this.ReadRom1_16;
-                this.ReadU16Funcs[0xA] = this.ReadRom1_16;
-                this.ReadU16Funcs[0xC] = this.ReadRom1_16;
-                this.ReadU32Funcs[0x8] = this.ReadRom1_32;
-                this.ReadU32Funcs[0xA] = this.ReadRom1_32;
-                this.ReadU32Funcs[0xC] = this.ReadRom1_32;
+                ReadU8Funcs[0x8] = ReadRom1_8;
+                ReadU8Funcs[0xA] = ReadRom1_8;
+                ReadU8Funcs[0xC] = ReadRom1_8;
+                ReadU16Funcs[0x8] = ReadRom1_16;
+                ReadU16Funcs[0xA] = ReadRom1_16;
+                ReadU16Funcs[0xC] = ReadRom1_16;
+                ReadU32Funcs[0x8] = ReadRom1_32;
+                ReadU32Funcs[0xA] = ReadRom1_32;
+                ReadU32Funcs[0xC] = ReadRom1_32;
             }
 
-            if (this.romBank2Mask != 0)
+            if (romBank2Mask != 0)
             {
-                this.ReadU8Funcs[0x9] = this.ReadRom2_8;
-                this.ReadU8Funcs[0xB] = this.ReadRom2_8;
-                this.ReadU8Funcs[0xD] = this.ReadRom2_8;
-                this.ReadU16Funcs[0x9] = this.ReadRom2_16;
-                this.ReadU16Funcs[0xB] = this.ReadRom2_16;
-                this.ReadU16Funcs[0xD] = this.ReadRom2_16;
-                this.ReadU32Funcs[0x9] = this.ReadRom2_32;
-                this.ReadU32Funcs[0xB] = this.ReadRom2_32;
-                this.ReadU32Funcs[0xD] = this.ReadRom2_32;
+                ReadU8Funcs[0x9] = ReadRom2_8;
+                ReadU8Funcs[0xB] = ReadRom2_8;
+                ReadU8Funcs[0xD] = ReadRom2_8;
+                ReadU16Funcs[0x9] = ReadRom2_16;
+                ReadU16Funcs[0xB] = ReadRom2_16;
+                ReadU16Funcs[0xD] = ReadRom2_16;
+                ReadU32Funcs[0x9] = ReadRom2_32;
+                ReadU32Funcs[0xB] = ReadRom2_32;
+                ReadU32Funcs[0xD] = ReadRom2_32;
             }
         }
 
         private void ResetRomBank1()
         {
-            this.romBank1 = null;
-            this.romBank1Mask = 0;
+            romBank1 = null;
+            romBank1Mask = 0;
 
-            for (int i = 0; i < this.bankSTimes.Length; i++)
+            for (var i = 0; i < bankSTimes.Length; i++)
             {
-                this.bankSTimes[i] = 2;
+                bankSTimes[i] = 2;
             }
 
-            this.ReadU8Funcs[0x8] = this.ReadNop8;
-            this.ReadU8Funcs[0xA] = this.ReadNop8;
-            this.ReadU8Funcs[0xC] = this.ReadNop8;
-            this.ReadU16Funcs[0x8] = this.ReadNop16;
-            this.ReadU16Funcs[0xA] = this.ReadNop16;
-            this.ReadU16Funcs[0xC] = this.ReadNop16;
-            this.ReadU32Funcs[0x8] = this.ReadNop32;
-            this.ReadU32Funcs[0xA] = this.ReadNop32;
-            this.ReadU32Funcs[0xC] = this.ReadNop32;
+            ReadU8Funcs[0x8] = ReadNop8;
+            ReadU8Funcs[0xA] = ReadNop8;
+            ReadU8Funcs[0xC] = ReadNop8;
+            ReadU16Funcs[0x8] = ReadNop16;
+            ReadU16Funcs[0xA] = ReadNop16;
+            ReadU16Funcs[0xC] = ReadNop16;
+            ReadU32Funcs[0x8] = ReadNop32;
+            ReadU32Funcs[0xA] = ReadNop32;
+            ReadU32Funcs[0xC] = ReadNop32;
         }
 
         private void ResetRomBank2()
         {
-            this.romBank2 = null;
-            this.romBank2Mask = 0;
+            romBank2 = null;
+            romBank2Mask = 0;
 
-            this.ReadU8Funcs[0x9] = this.ReadEeprom8;
-            this.ReadU8Funcs[0xB] = this.ReadEeprom8;
-            this.ReadU8Funcs[0xD] = this.ReadEeprom8;
-            this.ReadU16Funcs[0x9] = this.ReadEeprom16;
-            this.ReadU16Funcs[0xB] = this.ReadEeprom16;
-            this.ReadU16Funcs[0xD] = this.ReadEeprom16;
-            this.ReadU32Funcs[0x9] = this.ReadEeprom32;
-            this.ReadU32Funcs[0xB] = this.ReadEeprom32;
-            this.ReadU32Funcs[0xD] = this.ReadEeprom32;
+            ReadU8Funcs[0x9] = ReadEeprom8;
+            ReadU8Funcs[0xB] = ReadEeprom8;
+            ReadU8Funcs[0xD] = ReadEeprom8;
+            ReadU16Funcs[0x9] = ReadEeprom16;
+            ReadU16Funcs[0xB] = ReadEeprom16;
+            ReadU16Funcs[0xD] = ReadEeprom16;
+            ReadU32Funcs[0x9] = ReadEeprom32;
+            ReadU32Funcs[0xB] = ReadEeprom32;
+            ReadU32Funcs[0xD] = ReadEeprom32;
 
-            this.WriteU8Funcs[0x9] = this.WriteEeprom8;
-            this.WriteU8Funcs[0xB] = this.WriteEeprom8;
-            this.WriteU8Funcs[0xD] = this.WriteEeprom8;
-            this.WriteU16Funcs[0x9] = this.WriteEeprom16;
-            this.WriteU16Funcs[0xB] = this.WriteEeprom16;
-            this.WriteU16Funcs[0xD] = this.WriteEeprom16;
-            this.WriteU32Funcs[0x9] = this.WriteEeprom32;
-            this.WriteU32Funcs[0xB] = this.WriteEeprom32;
-            this.WriteU32Funcs[0xD] = this.WriteEeprom32;
+            WriteU8Funcs[0x9] = WriteEeprom8;
+            WriteU8Funcs[0xB] = WriteEeprom8;
+            WriteU8Funcs[0xD] = WriteEeprom8;
+            WriteU16Funcs[0x9] = WriteEeprom16;
+            WriteU16Funcs[0xB] = WriteEeprom16;
+            WriteU16Funcs[0xD] = WriteEeprom16;
+            WriteU32Funcs[0x9] = WriteEeprom32;
+            WriteU32Funcs[0xB] = WriteEeprom32;
+            WriteU32Funcs[0xD] = WriteEeprom32;
         }
     }
 }

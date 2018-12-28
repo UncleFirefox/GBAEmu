@@ -4,17 +4,15 @@ namespace GarboDev.Cores.DynamicCore
 {
     public class ArmArmletTranslator
     {
-        private Arm7Processor parent;
-        private Memory memory;
-        private uint[] registers;
+        private readonly Arm7Processor _parent;
+        private Memory _memory;
+        private uint[] _registers;
 
         public ArmArmletTranslator(Arm7Processor parent, Memory memory)
         {
-            this.parent = parent;
-            this.memory = memory;
-            this.registers = this.parent.Registers;
+            _parent = parent;
+            _memory = memory;
+            _registers = _parent.Registers;
         }
-
-
     }
 }

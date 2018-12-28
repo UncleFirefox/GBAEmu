@@ -41,24 +41,24 @@ namespace GarboDev.Cores.DynamicCore
         private const int OP_BIC = 0xE;
         private const int OP_MVN = 0xF;
 
-        private Arm7Processor parent;
-        private Memory memory;
-        private uint[] registers;
+        private readonly Arm7Processor parent;
+        private readonly Memory memory;
+        private readonly uint[] registers;
 
         // CPU flags
         private uint zero, carry, negative, overflow;
         private ushort curInstruction, instructionQueue;
 
         private delegate void ExecuteInstruction();
-        private ExecuteInstruction[] NormalOps = null;
+        private readonly ExecuteInstruction[] NormalOps;
 
         public ThumbArmletTranslator(Arm7Processor parent, Memory memory)
         {
             this.parent = parent;
             this.memory = memory;
-            this.registers = this.parent.Registers;
+            registers = this.parent.Registers;
 
-            this.NormalOps = new ExecuteInstruction[256]
+            NormalOps = new ExecuteInstruction[256]
                 {
                     OpLslImm, OpLslImm, OpLslImm, OpLslImm, OpLslImm, OpLslImm, OpLslImm, OpLslImm,
                     OpLsrImm, OpLsrImm, OpLsrImm, OpLsrImm, OpLsrImm, OpLsrImm, OpLsrImm, OpLsrImm,
@@ -97,48 +97,48 @@ namespace GarboDev.Cores.DynamicCore
 
         public void BeginExecution()
         {
-            this.FlushQueue();
+            FlushQueue();
         }
 
         public void Step()
         {
-            this.UnpackFlags();
+            UnpackFlags();
 
-            this.curInstruction = this.instructionQueue;
-            this.instructionQueue = this.memory.ReadU16(registers[15]);
+            curInstruction = instructionQueue;
+            instructionQueue = memory.ReadU16(registers[15]);
             registers[15] += 2;
 
             // Execute the instruction
-            this.NormalOps[this.curInstruction >> 8]();
+            NormalOps[curInstruction >> 8]();
 
-            this.parent.Cycles -= this.memory.WaitCycles;
+            parent.Cycles -= memory.WaitCycles;
 
-            if ((this.parent.CPSR & Arm7Processor.T_MASK) != Arm7Processor.T_MASK)
+            if ((parent.CPSR & Arm7Processor.T_MASK) != Arm7Processor.T_MASK)
             {
-                if ((this.curInstruction >> 8) != 0xDF) this.parent.ReloadQueue();
+                if ((curInstruction >> 8) != 0xDF) parent.ReloadQueue();
             }
 
-            this.PackFlags();
+            PackFlags();
         }
 
         public void Execute()
         {
-            this.UnpackFlags();
+            UnpackFlags();
 
-            while (this.parent.Cycles > 0)
+            while (parent.Cycles > 0)
             {
-                this.curInstruction = this.instructionQueue;
-                this.instructionQueue = this.memory.ReadU16(registers[15]);
+                curInstruction = instructionQueue;
+                instructionQueue = memory.ReadU16(registers[15]);
                 registers[15] += 2;
 
                 // Execute the instruction
-                this.NormalOps[this.curInstruction >> 8]();
+                NormalOps[curInstruction >> 8]();
 
-                this.parent.Cycles -= this.memory.WaitCycles;
+                parent.Cycles -= memory.WaitCycles;
 
-                if ((this.parent.CPSR & Arm7Processor.T_MASK) != Arm7Processor.T_MASK)
+                if ((parent.CPSR & Arm7Processor.T_MASK) != Arm7Processor.T_MASK)
                 {
-                    if ((this.curInstruction >> 8) != 0xDF) this.parent.ReloadQueue();
+                    if ((curInstruction >> 8) != 0xDF) parent.ReloadQueue();
                     break;
                 }
 
@@ -152,7 +152,7 @@ namespace GarboDev.Cores.DynamicCore
 #endif
             }
 
-            this.PackFlags();
+            PackFlags();
         }
 
         #region Flag helpers
@@ -174,9 +174,9 @@ namespace GarboDev.Cores.DynamicCore
         {
             // 0x00 - 0x07
             // lsl rd, rm, #immed
-            int rd = this.curInstruction & 0x7;
-            int rm = (this.curInstruction >> 3) & 0x7;
-            int immed = (this.curInstruction >> 6) & 0x1F;
+            var rd = curInstruction & 0x7;
+            var rm = (curInstruction >> 3) & 0x7;
+            var immed = (curInstruction >> 6) & 0x1F;
 
             if (immed == 0)
             {
@@ -196,9 +196,9 @@ namespace GarboDev.Cores.DynamicCore
         {
             // 0x08 - 0x0F
             // lsr rd, rm, #immed
-            int rd = this.curInstruction & 0x7;
-            int rm = (this.curInstruction >> 3) & 0x7;
-            int immed = (this.curInstruction >> 6) & 0x1F;
+            var rd = curInstruction & 0x7;
+            var rm = (curInstruction >> 3) & 0x7;
+            var immed = (curInstruction >> 6) & 0x1F;
 
             if (immed == 0)
             {
@@ -218,9 +218,9 @@ namespace GarboDev.Cores.DynamicCore
         private void OpAsrImm()
         {
             // asr rd, rm, #immed
-            int rd = this.curInstruction & 0x7;
-            int rm = (this.curInstruction >> 3) & 0x7;
-            int immed = (this.curInstruction >> 6) & 0x1F;
+            var rd = curInstruction & 0x7;
+            var rm = (curInstruction >> 3) & 0x7;
+            var immed = (curInstruction >> 6) & 0x1F;
 
             if (immed == 0)
             {
@@ -241,16 +241,16 @@ namespace GarboDev.Cores.DynamicCore
         private void OpAddRegReg()
         {
             // add rd, rn, rm
-            int rd = this.curInstruction & 0x7;
-            int rn = (this.curInstruction >> 3) & 0x7;
-            int rm = (this.curInstruction >> 6) & 0x7;
+            var rd = curInstruction & 0x7;
+            var rn = (curInstruction >> 3) & 0x7;
+            var rm = (curInstruction >> 6) & 0x7;
 
-            uint orn = registers[rn];
-            uint orm = registers[rm];
+            var orn = registers[rn];
+            var orm = registers[rm];
 
             registers[rd] = orn + orm;
 
-            this.OverflowCarryAdd(orn, orm, registers[rd]);
+            OverflowCarryAdd(orn, orm, registers[rd]);
             negative = registers[rd] >> 31;
             zero = registers[rd] == 0 ? 1U : 0U;
         }
@@ -258,16 +258,16 @@ namespace GarboDev.Cores.DynamicCore
         private void OpSubRegReg()
         {
             // sub rd, rn, rm
-            int rd = this.curInstruction & 0x7;
-            int rn = (this.curInstruction >> 3) & 0x7;
-            int rm = (this.curInstruction >> 6) & 0x7;
+            var rd = curInstruction & 0x7;
+            var rn = (curInstruction >> 3) & 0x7;
+            var rm = (curInstruction >> 6) & 0x7;
 
-            uint orn = registers[rn];
-            uint orm = registers[rm];
+            var orn = registers[rn];
+            var orm = registers[rm];
 
             registers[rd] = orn - orm;
 
-            this.OverflowCarrySub(orn, orm, registers[rd]);
+            OverflowCarrySub(orn, orm, registers[rd]);
             negative = registers[rd] >> 31;
             zero = registers[rd] == 0 ? 1U : 0U;
         }
@@ -275,15 +275,15 @@ namespace GarboDev.Cores.DynamicCore
         private void OpAddRegImm()
         {
             // add rd, rn, #immed
-            int rd = this.curInstruction & 0x7;
-            int rn = (this.curInstruction >> 3) & 0x7;
-            uint immed = (uint)((this.curInstruction >> 6) & 0x7);
+            var rd = curInstruction & 0x7;
+            var rn = (curInstruction >> 3) & 0x7;
+            var immed = (uint)((curInstruction >> 6) & 0x7);
 
-            uint orn = registers[rn];
+            var orn = registers[rn];
 
             registers[rd] = orn + immed;
 
-            this.OverflowCarryAdd(orn, immed, registers[rd]);
+            OverflowCarryAdd(orn, immed, registers[rd]);
             negative = registers[rd] >> 31;
             zero = registers[rd] == 0 ? 1U : 0U;
         }
@@ -291,15 +291,15 @@ namespace GarboDev.Cores.DynamicCore
         private void OpSubRegImm()
         {
             // sub rd, rn, #immed
-            int rd = this.curInstruction & 0x7;
-            int rn = (this.curInstruction >> 3) & 0x7;
-            uint immed = (uint)((this.curInstruction >> 6) & 0x7);
+            var rd = curInstruction & 0x7;
+            var rn = (curInstruction >> 3) & 0x7;
+            var immed = (uint)((curInstruction >> 6) & 0x7);
 
-            uint orn = registers[rn];
+            var orn = registers[rn];
 
             registers[rd] = orn - immed;
 
-            this.OverflowCarrySub(orn, immed, registers[rd]);
+            OverflowCarrySub(orn, immed, registers[rd]);
             negative = registers[rd] >> 31;
             zero = registers[rd] == 0 ? 1U : 0U;
         }
@@ -307,9 +307,9 @@ namespace GarboDev.Cores.DynamicCore
         private void OpMovImm()
         {
             // mov rd, #immed
-            int rd = (this.curInstruction >> 8) & 0x7;
+            var rd = (curInstruction >> 8) & 0x7;
 
-            registers[rd] = (uint)(this.curInstruction & 0xFF);
+            registers[rd] = (uint)(curInstruction & 0xFF);
 
             negative = 0;
             zero = registers[rd] == 0 ? 1U : 0U;
@@ -318,11 +318,11 @@ namespace GarboDev.Cores.DynamicCore
         private void OpCmpImm()
         {
             // cmp rn, #immed
-            int rn = (this.curInstruction >> 8) & 0x7;
+            var rn = (curInstruction >> 8) & 0x7;
 
-            uint alu = registers[rn] - (uint)(this.curInstruction & 0xFF);
+            var alu = registers[rn] - (uint)(curInstruction & 0xFF);
 
-            this.OverflowCarrySub(registers[rn], (uint)(this.curInstruction & 0xFF), alu);
+            OverflowCarrySub(registers[rn], (uint)(curInstruction & 0xFF), alu);
             negative = alu >> 31;
             zero = alu == 0 ? 1U : 0U;
         }
@@ -330,13 +330,13 @@ namespace GarboDev.Cores.DynamicCore
         private void OpAddImm()
         {
             // add rd, #immed
-            int rd = (this.curInstruction >> 8) & 0x7;
+            var rd = (curInstruction >> 8) & 0x7;
 
-            uint ord = registers[rd];
+            var ord = registers[rd];
 
-            registers[rd] += (uint)(this.curInstruction & 0xFF);
+            registers[rd] += (uint)(curInstruction & 0xFF);
 
-            this.OverflowCarryAdd(ord, (uint)(this.curInstruction & 0xFF), registers[rd]);
+            OverflowCarryAdd(ord, (uint)(curInstruction & 0xFF), registers[rd]);
             negative = registers[rd] >> 31;
             zero = registers[rd] == 0 ? 1U : 0U;
         }
@@ -344,26 +344,26 @@ namespace GarboDev.Cores.DynamicCore
         private void OpSubImm()
         {
             // sub rd, #immed
-            int rd = (this.curInstruction >> 8) & 0x7;
+            var rd = (curInstruction >> 8) & 0x7;
 
-            uint ord = registers[rd];
+            var ord = registers[rd];
 
-            registers[rd] -= (uint)(this.curInstruction & 0xFF);
+            registers[rd] -= (uint)(curInstruction & 0xFF);
 
-            this.OverflowCarrySub(ord, (uint)(this.curInstruction & 0xFF), registers[rd]);
+            OverflowCarrySub(ord, (uint)(curInstruction & 0xFF), registers[rd]);
             negative = registers[rd] >> 31;
             zero = registers[rd] == 0 ? 1U : 0U;
         }
 
         private void OpArith()
         {
-            int rd = this.curInstruction & 0x7;
-            uint rn = registers[(this.curInstruction >> 3) & 0x7];
+            var rd = curInstruction & 0x7;
+            var rn = registers[(curInstruction >> 3) & 0x7];
 
             uint orig, alu;
             int shiftAmt;
 
-            switch ((this.curInstruction >> 6) & 0xF)
+            switch ((curInstruction >> 6) & 0xF)
             {
                 case OP_ADC:
                     orig = registers[rd];
@@ -371,7 +371,7 @@ namespace GarboDev.Cores.DynamicCore
 
                     negative = registers[rd] >> 31;
                     zero = registers[rd] == 0 ? 1U : 0U;
-                    this.OverflowCarryAdd(orig, rn, registers[rd]);
+                    OverflowCarryAdd(orig, rn, registers[rd]);
                     break;
 
                 case OP_AND:
@@ -415,7 +415,7 @@ namespace GarboDev.Cores.DynamicCore
 
                     negative = alu >> 31;
                     zero = alu == 0 ? 1U : 0U;
-                    this.OverflowCarryAdd(registers[rd], rn, alu);
+                    OverflowCarryAdd(registers[rd], rn, alu);
                     break;
 
                 case OP_CMP:
@@ -423,7 +423,7 @@ namespace GarboDev.Cores.DynamicCore
 
                     negative = alu >> 31;
                     zero = alu == 0 ? 1U : 0U;
-                    this.OverflowCarrySub(registers[rd], rn, alu);
+                    OverflowCarrySub(registers[rd], rn, alu);
                     break;
 
                 case OP_EOR:
@@ -486,7 +486,7 @@ namespace GarboDev.Cores.DynamicCore
                     break;
 
                 case OP_MUL:
-                    int mulCycles = 4;
+                    var mulCycles = 4;
                     // Multiply cycle calculations
                     if ((rn & 0xFFFFFF00) == 0 || (rn & 0xFFFFFF00) == 0xFFFFFF00)
                     {
@@ -501,7 +501,7 @@ namespace GarboDev.Cores.DynamicCore
                         mulCycles = 3;
                     }
 
-                    this.parent.Cycles -= mulCycles;
+                    parent.Cycles -= mulCycles;
 
                     registers[rd] *= rn;
 
@@ -519,7 +519,7 @@ namespace GarboDev.Cores.DynamicCore
                 case OP_NEG:
                     registers[rd] = 0 - rn;
 
-                    this.OverflowCarrySub(0, rn, registers[rd]);
+                    OverflowCarrySub(0, rn, registers[rd]);
                     negative = registers[rd] >> 31;
                     zero = registers[rd] == 0 ? 1U : 0U;
                     break;
@@ -558,7 +558,7 @@ namespace GarboDev.Cores.DynamicCore
 
                     negative = registers[rd] >> 31;
                     zero = registers[rd] == 0 ? 1U : 0U;
-                    this.OverflowCarrySub(orig, rn, registers[rd]);
+                    OverflowCarrySub(orig, rn, registers[rd]);
                     break;
 
                 case OP_TST:
@@ -575,225 +575,225 @@ namespace GarboDev.Cores.DynamicCore
 
         private void OpAddHi()
         {
-            int rd = ((this.curInstruction & (1 << 7)) >> 4) | (this.curInstruction & 0x7);
-            int rm = (this.curInstruction >> 3) & 0xF;
+            var rd = ((curInstruction & (1 << 7)) >> 4) | (curInstruction & 0x7);
+            var rm = (curInstruction >> 3) & 0xF;
 
             registers[rd] += registers[rm];
 
             if (rd == 15)
             {
                 registers[rd] &= ~1U;
-                this.FlushQueue();
+                FlushQueue();
             }
         }
 
         private void OpCmpHi()
         {
-            int rd = ((this.curInstruction & (1 << 7)) >> 4) | (this.curInstruction & 0x7);
-            int rm = (this.curInstruction >> 3) & 0xF;
+            var rd = ((curInstruction & (1 << 7)) >> 4) | (curInstruction & 0x7);
+            var rm = (curInstruction >> 3) & 0xF;
 
-            uint alu = registers[rd] - registers[rm];
+            var alu = registers[rd] - registers[rm];
 
             negative = alu >> 31;
             zero = alu == 0 ? 1U : 0U;
-            this.OverflowCarrySub(registers[rd], registers[rm], alu);
+            OverflowCarrySub(registers[rd], registers[rm], alu);
         }
 
         private void OpMovHi()
         {
-            int rd = ((this.curInstruction & (1 << 7)) >> 4) | (this.curInstruction & 0x7);
-            int rm = (this.curInstruction >> 3) & 0xF;
+            var rd = ((curInstruction & (1 << 7)) >> 4) | (curInstruction & 0x7);
+            var rm = (curInstruction >> 3) & 0xF;
 
             registers[rd] = registers[rm];
 
             if (rd == 15)
             {
                 registers[rd] &= ~1U;
-                this.FlushQueue();
+                FlushQueue();
             }
         }
 
         private void OpBx()
         {
-            int rm = (this.curInstruction >> 3) & 0xf;
+            var rm = (curInstruction >> 3) & 0xf;
 
-            this.PackFlags();
+            PackFlags();
 
-            this.parent.CPSR &= ~Arm7Processor.T_MASK;
-            this.parent.CPSR |= (registers[rm] & 1) << Arm7Processor.T_BIT;
+            parent.CPSR &= ~Arm7Processor.T_MASK;
+            parent.CPSR |= (registers[rm] & 1) << Arm7Processor.T_BIT;
 
             registers[15] = registers[rm] & (~1U);
 
-            this.UnpackFlags();
+            UnpackFlags();
 
             // Check for branch back to Arm Mode
-            if ((this.parent.CPSR & Arm7Processor.T_MASK) != Arm7Processor.T_MASK)
+            if ((parent.CPSR & Arm7Processor.T_MASK) != Arm7Processor.T_MASK)
             {
                 return;
             }
 
-            this.FlushQueue();
+            FlushQueue();
         }
 
         private void OpLdrPc()
         {
-            int rd = (this.curInstruction >> 8) & 0x7;
+            var rd = (curInstruction >> 8) & 0x7;
 
-            registers[rd] = this.memory.ReadU32((registers[15] & ~2U) + (uint)((this.curInstruction & 0xFF) * 4));
+            registers[rd] = memory.ReadU32((registers[15] & ~2U) + (uint)((curInstruction & 0xFF) * 4));
 
-            this.parent.Cycles--;
+            parent.Cycles--;
         }
 
         private void OpStrReg()
         {
-            this.memory.WriteU32(registers[(this.curInstruction >> 3) & 0x7] + registers[(this.curInstruction >> 6) & 0x7],
-                registers[this.curInstruction & 0x7]);
+            memory.WriteU32(registers[(curInstruction >> 3) & 0x7] + registers[(curInstruction >> 6) & 0x7],
+                registers[curInstruction & 0x7]);
         }
 
         private void OpStrhReg()
         {
-            this.memory.WriteU16(registers[(this.curInstruction >> 3) & 0x7] + registers[(this.curInstruction >> 6) & 0x7],
-                (ushort)(registers[this.curInstruction & 0x7] & 0xFFFF));
+            memory.WriteU16(registers[(curInstruction >> 3) & 0x7] + registers[(curInstruction >> 6) & 0x7],
+                (ushort)(registers[curInstruction & 0x7] & 0xFFFF));
         }
 
         private void OpStrbReg()
         {
-            this.memory.WriteU8(registers[(this.curInstruction >> 3) & 0x7] + registers[(this.curInstruction >> 6) & 0x7],
-                (byte)(registers[this.curInstruction & 0x7] & 0xFF));
+            memory.WriteU8(registers[(curInstruction >> 3) & 0x7] + registers[(curInstruction >> 6) & 0x7],
+                (byte)(registers[curInstruction & 0x7] & 0xFF));
         }
 
         private void OpLdrsbReg()
         {
-            registers[this.curInstruction & 0x7] =
-                this.memory.ReadU8(registers[(this.curInstruction >> 3) & 0x7] + registers[(this.curInstruction >> 6) & 0x7]);
+            registers[curInstruction & 0x7] =
+                memory.ReadU8(registers[(curInstruction >> 3) & 0x7] + registers[(curInstruction >> 6) & 0x7]);
 
-            if ((registers[this.curInstruction & 0x7] & (1 << 7)) != 0)
+            if ((registers[curInstruction & 0x7] & (1 << 7)) != 0)
             {
-                registers[this.curInstruction & 0x7] |= 0xFFFFFF00;
+                registers[curInstruction & 0x7] |= 0xFFFFFF00;
             }
 
-            this.parent.Cycles--;
+            parent.Cycles--;
         }
 
         private void OpLdrReg()
         {
-            registers[this.curInstruction & 0x7] =
-                this.memory.ReadU32(registers[(this.curInstruction >> 3) & 0x7] + registers[(this.curInstruction >> 6) & 0x7]);
+            registers[curInstruction & 0x7] =
+                memory.ReadU32(registers[(curInstruction >> 3) & 0x7] + registers[(curInstruction >> 6) & 0x7]);
 
-            this.parent.Cycles--;
+            parent.Cycles--;
         }
 
         private void OpLdrhReg()
         {
-            registers[this.curInstruction & 0x7] =
-                this.memory.ReadU16(registers[(this.curInstruction >> 3) & 0x7] + registers[(this.curInstruction >> 6) & 0x7]);
+            registers[curInstruction & 0x7] =
+                memory.ReadU16(registers[(curInstruction >> 3) & 0x7] + registers[(curInstruction >> 6) & 0x7]);
 
-            this.parent.Cycles--;
+            parent.Cycles--;
         }
 
         private void OpLdrbReg()
         {
-            registers[this.curInstruction & 0x7] =
-                this.memory.ReadU8(registers[(this.curInstruction >> 3) & 0x7] + registers[(this.curInstruction >> 6) & 0x7]);
+            registers[curInstruction & 0x7] =
+                memory.ReadU8(registers[(curInstruction >> 3) & 0x7] + registers[(curInstruction >> 6) & 0x7]);
 
-            this.parent.Cycles--;
+            parent.Cycles--;
         }
 
         private void OpLdrshReg()
         {
-            registers[this.curInstruction & 0x7] =
-                this.memory.ReadU16(registers[(this.curInstruction >> 3) & 0x7] + registers[(this.curInstruction >> 6) & 0x7]);
+            registers[curInstruction & 0x7] =
+                memory.ReadU16(registers[(curInstruction >> 3) & 0x7] + registers[(curInstruction >> 6) & 0x7]);
 
-            if ((registers[this.curInstruction & 0x7] & (1 << 15)) != 0)
+            if ((registers[curInstruction & 0x7] & (1 << 15)) != 0)
             {
-                registers[this.curInstruction & 0x7] |= 0xFFFF0000;
+                registers[curInstruction & 0x7] |= 0xFFFF0000;
             }
 
-            this.parent.Cycles--;
+            parent.Cycles--;
         }
 
         private void OpStrImm()
         {
-            this.memory.WriteU32(registers[(this.curInstruction >> 3) & 0x7] + (uint)(((this.curInstruction >> 6) & 0x1F) * 4),
-                registers[this.curInstruction & 0x7]);
+            memory.WriteU32(registers[(curInstruction >> 3) & 0x7] + (uint)(((curInstruction >> 6) & 0x1F) * 4),
+                registers[curInstruction & 0x7]);
         }
 
         private void OpLdrImm()
         {
-            registers[this.curInstruction & 0x7] =
-                this.memory.ReadU32(registers[(this.curInstruction >> 3) & 0x7] + (uint)(((this.curInstruction >> 6) & 0x1F) * 4));
+            registers[curInstruction & 0x7] =
+                memory.ReadU32(registers[(curInstruction >> 3) & 0x7] + (uint)(((curInstruction >> 6) & 0x1F) * 4));
 
-            this.parent.Cycles--;
+            parent.Cycles--;
         }
 
         private void OpStrbImm()
         {
-            this.memory.WriteU8(registers[(this.curInstruction >> 3) & 0x7] + (uint)((this.curInstruction >> 6) & 0x1F),
-                (byte)(registers[this.curInstruction & 0x7] & 0xFF));
+            memory.WriteU8(registers[(curInstruction >> 3) & 0x7] + (uint)((curInstruction >> 6) & 0x1F),
+                (byte)(registers[curInstruction & 0x7] & 0xFF));
         }
 
         private void OpLdrbImm()
         {
-            registers[this.curInstruction & 0x7] =
-                this.memory.ReadU8(registers[(this.curInstruction >> 3) & 0x7] + (uint)((this.curInstruction >> 6) & 0x1F));
+            registers[curInstruction & 0x7] =
+                memory.ReadU8(registers[(curInstruction >> 3) & 0x7] + (uint)((curInstruction >> 6) & 0x1F));
 
-            this.parent.Cycles--;
+            parent.Cycles--;
         }
 
         private void OpStrhImm()
         {
-            this.memory.WriteU16(registers[(this.curInstruction >> 3) & 0x7] + (uint)(((this.curInstruction >> 6) & 0x1F) * 2),
-                (ushort)(registers[this.curInstruction & 0x7] & 0xFFFF));
+            memory.WriteU16(registers[(curInstruction >> 3) & 0x7] + (uint)(((curInstruction >> 6) & 0x1F) * 2),
+                (ushort)(registers[curInstruction & 0x7] & 0xFFFF));
         }
 
         private void OpLdrhImm()
         {
-            registers[this.curInstruction & 0x7] =
-                this.memory.ReadU16(registers[(this.curInstruction >> 3) & 0x7] + (uint)(((this.curInstruction >> 6) & 0x1F) * 2));
+            registers[curInstruction & 0x7] =
+                memory.ReadU16(registers[(curInstruction >> 3) & 0x7] + (uint)(((curInstruction >> 6) & 0x1F) * 2));
 
-            this.parent.Cycles--;
+            parent.Cycles--;
         }
 
         private void OpStrSp()
         {
-            this.memory.WriteU32(registers[13] + (uint)((this.curInstruction & 0xFF) * 4),
-                registers[(this.curInstruction >> 8) & 0x7]);
+            memory.WriteU32(registers[13] + (uint)((curInstruction & 0xFF) * 4),
+                registers[(curInstruction >> 8) & 0x7]);
         }
 
         private void OpLdrSp()
         {
-            registers[(this.curInstruction >> 8) & 0x7] =
-                this.memory.ReadU32(registers[13] + (uint)((this.curInstruction & 0xFF) * 4));
+            registers[(curInstruction >> 8) & 0x7] =
+                memory.ReadU32(registers[13] + (uint)((curInstruction & 0xFF) * 4));
         }
 
         private void OpAddPc()
         {
-            registers[(this.curInstruction >> 8) & 0x7] =
-                (registers[15] & ~2U) + (uint)((this.curInstruction & 0xFF) * 4);
+            registers[(curInstruction >> 8) & 0x7] =
+                (registers[15] & ~2U) + (uint)((curInstruction & 0xFF) * 4);
         }
 
         private void OpAddSp()
         {
-            registers[(this.curInstruction >> 8) & 0x7] =
-                registers[13] + (uint)((this.curInstruction & 0xFF) * 4);
+            registers[(curInstruction >> 8) & 0x7] =
+                registers[13] + (uint)((curInstruction & 0xFF) * 4);
         }
 
         private void OpSubSp()
         {
-            if ((this.curInstruction & (1 << 7)) != 0)
-                registers[13] -= (uint)((this.curInstruction & 0x7F) * 4);
+            if ((curInstruction & (1 << 7)) != 0)
+                registers[13] -= (uint)((curInstruction & 0x7F) * 4);
             else
-                registers[13] += (uint)((this.curInstruction & 0x7F) * 4);
+                registers[13] += (uint)((curInstruction & 0x7F) * 4);
         }
 
         private void OpPush()
         {
-            for (int i = 7; i >= 0; i--)
+            for (var i = 7; i >= 0; i--)
             {
-                if (((this.curInstruction >> i) & 1) != 0)
+                if (((curInstruction >> i) & 1) != 0)
                 {
                     registers[13] -= 4;
-                    this.memory.WriteU32(registers[13], registers[i]);
+                    memory.WriteU32(registers[13], registers[i]);
                 }
             }
         }
@@ -801,62 +801,62 @@ namespace GarboDev.Cores.DynamicCore
         private void OpPushLr()
         {
             registers[13] -= 4;
-            this.memory.WriteU32(registers[13], registers[14]);
+            memory.WriteU32(registers[13], registers[14]);
 
-            for (int i = 7; i >= 0; i--)
+            for (var i = 7; i >= 0; i--)
             {
-                if (((this.curInstruction >> i) & 1) != 0)
+                if (((curInstruction >> i) & 1) != 0)
                 {
                     registers[13] -= 4;
-                    this.memory.WriteU32(registers[13], registers[i]);
+                    memory.WriteU32(registers[13], registers[i]);
                 }
             }
         }
 
         private void OpPop()
         {
-            for (int i = 0; i < 8; i++)
+            for (var i = 0; i < 8; i++)
             {
-                if (((this.curInstruction >> i) & 1) != 0)
+                if (((curInstruction >> i) & 1) != 0)
                 {
-                    registers[i] = this.memory.ReadU32(registers[13]);
+                    registers[i] = memory.ReadU32(registers[13]);
                     registers[13] += 4;
                 }
             }
 
-            this.parent.Cycles--;
+            parent.Cycles--;
         }
 
         private void OpPopPc()
         {
-            for (int i = 0; i < 8; i++)
+            for (var i = 0; i < 8; i++)
             {
-                if (((this.curInstruction >> i) & 1) != 0)
+                if (((curInstruction >> i) & 1) != 0)
                 {
-                    registers[i] = this.memory.ReadU32(registers[13]);
+                    registers[i] = memory.ReadU32(registers[13]);
                     registers[13] += 4;
                 }
             }
 
-            registers[15] = this.memory.ReadU32(registers[13]) & (~1U);
+            registers[15] = memory.ReadU32(registers[13]) & (~1U);
             registers[13] += 4;
 
             // ARM9 check here
 
-            this.FlushQueue();
+            FlushQueue();
 
-            this.parent.Cycles--;
+            parent.Cycles--;
         }
 
         private void OpStmia()
         {
-            int rn = (this.curInstruction >> 8) & 0x7;
+            var rn = (curInstruction >> 8) & 0x7;
 
-            for (int i = 0; i < 8; i++)
+            for (var i = 0; i < 8; i++)
             {
-                if (((this.curInstruction >> i) & 1) != 0)
+                if (((curInstruction >> i) & 1) != 0)
                 {
-                    this.memory.WriteU32(registers[rn] & (~3U), registers[i]);
+                    memory.WriteU32(registers[rn] & (~3U), registers[i]);
                     registers[rn] += 4;
                 }
             }
@@ -864,20 +864,20 @@ namespace GarboDev.Cores.DynamicCore
 
         private void OpLdmia()
         {
-            int rn = (this.curInstruction >> 8) & 0x7;
+            var rn = (curInstruction >> 8) & 0x7;
 
-            uint address = registers[rn];
+            var address = registers[rn];
 
-            for (int i = 0; i < 8; i++)
+            for (var i = 0; i < 8; i++)
             {
-                if (((this.curInstruction >> i) & 1) != 0)
+                if (((curInstruction >> i) & 1) != 0)
                 {
-                    registers[i] = this.memory.ReadU32(address & (~3U));
+                    registers[i] = memory.ReadU32(address & (~3U));
                     address += 4;
                 }
             }
 
-            if (((this.curInstruction >> rn) & 1) == 0)
+            if (((curInstruction >> rn) & 1) == 0)
             {
                 registers[rn] = address;
             }
@@ -886,7 +886,7 @@ namespace GarboDev.Cores.DynamicCore
         private void OpBCond()
         {
             uint cond = 0;
-            switch ((this.curInstruction >> 8) & 0xF)
+            switch ((curInstruction >> 8) & 0xF)
             {
                 case COND_AL: cond = 1; break;
                 case COND_EQ: cond = zero; break;
@@ -907,34 +907,34 @@ namespace GarboDev.Cores.DynamicCore
 
             if (cond == 1)
             {
-                uint offset = (uint)(this.curInstruction & 0xFF);
+                var offset = (uint)(curInstruction & 0xFF);
                 if ((offset & (1 << 7)) != 0) offset |= 0xFFFFFF00;
 
                 registers[15] += offset << 1;
 
-                this.FlushQueue();
+                FlushQueue();
             }
         }
 
         private void OpSwi()
         {
             registers[15] -= 4U;
-            this.parent.EnterException(Arm7Processor.SVC, 0x8, false, false);
+            parent.EnterException(Arm7Processor.SVC, 0x8, false, false);
         }
 
         private void OpB()
         {
-            uint offset = (uint)(this.curInstruction & 0x7FF);
+            var offset = (uint)(curInstruction & 0x7FF);
             if ((offset & (1 << 10)) != 0) offset |= 0xFFFFF800;
 
             registers[15] += offset << 1;
 
-            this.FlushQueue();
+            FlushQueue();
         }
 
         private void OpBl1()
         {
-            uint offset = (uint)(this.curInstruction & 0x7FF);
+            var offset = (uint)(curInstruction & 0x7FF);
             if ((offset & (1 << 10)) != 0) offset |= 0xFFFFF800;
 
             registers[14] = registers[15] + (offset << 12);
@@ -942,11 +942,11 @@ namespace GarboDev.Cores.DynamicCore
 
         private void OpBl2()
         {
-            uint tmp = registers[15];
-            registers[15] = registers[14] + (uint)((this.curInstruction & 0x7FF) << 1);
+            var tmp = registers[15];
+            registers[15] = registers[14] + (uint)((curInstruction & 0x7FF) << 1);
             registers[14] = (tmp - 2U) | 1;
 
-            this.FlushQueue();
+            FlushQueue();
         }
 
         private void OpUnd()
@@ -957,24 +957,24 @@ namespace GarboDev.Cores.DynamicCore
 
         private void PackFlags()
         {
-            this.parent.CPSR &= 0x0FFFFFFF;
-            this.parent.CPSR |= this.negative << Arm7Processor.N_BIT;
-            this.parent.CPSR |= this.zero << Arm7Processor.Z_BIT;
-            this.parent.CPSR |= this.carry << Arm7Processor.C_BIT;
-            this.parent.CPSR |= this.overflow << Arm7Processor.V_BIT;
+            parent.CPSR &= 0x0FFFFFFF;
+            parent.CPSR |= negative << Arm7Processor.N_BIT;
+            parent.CPSR |= zero << Arm7Processor.Z_BIT;
+            parent.CPSR |= carry << Arm7Processor.C_BIT;
+            parent.CPSR |= overflow << Arm7Processor.V_BIT;
         }
 
         private void UnpackFlags()
         {
-            this.negative = (this.parent.CPSR >> Arm7Processor.N_BIT) & 1;
-            this.zero = (this.parent.CPSR >> Arm7Processor.Z_BIT) & 1;
-            this.carry = (this.parent.CPSR >> Arm7Processor.C_BIT) & 1;
-            this.overflow = (this.parent.CPSR >> Arm7Processor.V_BIT) & 1;
+            negative = (parent.CPSR >> Arm7Processor.N_BIT) & 1;
+            zero = (parent.CPSR >> Arm7Processor.Z_BIT) & 1;
+            carry = (parent.CPSR >> Arm7Processor.C_BIT) & 1;
+            overflow = (parent.CPSR >> Arm7Processor.V_BIT) & 1;
         }
 
         private void FlushQueue()
         {
-            this.instructionQueue = this.memory.ReadU16(registers[15]);
+            instructionQueue = memory.ReadU16(registers[15]);
             registers[15] += 2;
         }
     }

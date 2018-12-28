@@ -14,7 +14,7 @@ namespace GarboDev.WinForms
         {
             Application.EnableVisualStyles();
 
-            MainWindow mainWindow = new MainWindow();
+            var mainWindow = new MainWindow();
 
             mainWindow.Show();
 

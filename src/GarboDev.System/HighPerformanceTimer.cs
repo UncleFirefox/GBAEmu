@@ -26,7 +26,7 @@ namespace GarboDev.CrossCutting
         #endregion
 
         #region Member Variables
-        private long startTime = 0;
+        private long startTime;
         #endregion
 
         public HighPerformanceTimer()
@@ -37,28 +37,22 @@ namespace GarboDev.CrossCutting
         public void Start()
         {
             // Record when the timer was started.
-            this.startTime = HighPerformanceTimer.Counter;
+            startTime = Counter;
         }
         #endregion
 
         #region Static Properties
-        private static long frequency;
+        private static readonly long frequency;
 
         static HighPerformanceTimer()
         {
-            QueryPerformanceFrequency(out HighPerformanceTimer.frequency);
+            QueryPerformanceFrequency(out frequency);
         }
 
         /// <summary>
         /// Gets the frequency that this HighPerformanceTimer performs at.
         /// </summary>
-        public static long Frequency
-        {
-            get
-            {
-                return HighPerformanceTimer.frequency;
-            }
-        }
+        public static long Frequency => frequency;
 
         /// <summary>
         /// Gets the current system ticks.
@@ -78,29 +72,12 @@ namespace GarboDev.CrossCutting
         /// <summary>
         /// Gets the tick count of when this HighPerformanceTimer was started.
         /// </summary>
-        public long StartTime
-        {
-            get
-            {
-                return this.startTime;
-            }
-        }
+        public long StartTime => startTime;
 
-        public long Elapsed
-        {
-            get
-            {
-                return HighPerformanceTimer.Counter - this.startTime;
-            }
-        }
+        public long Elapsed => Counter - startTime;
 
-        public double ElapsedSeconds
-        {
-            get
-            {
-                return ((double)this.Elapsed) / HighPerformanceTimer.Frequency;
-            }
-        }
+        public double ElapsedSeconds => ((double)Elapsed) / Frequency;
+
         #endregion
     }
 }

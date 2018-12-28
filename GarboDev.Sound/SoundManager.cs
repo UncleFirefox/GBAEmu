@@ -1,56 +1,55 @@
 using System.Collections.Generic;
-using System.Runtime.CompilerServices;
 using GarboDev.CrossCutting;
 
 namespace GarboDev.Sound
 {
     public class SoundManager
     {
-        private Memory memory = null;
-        private Queue<byte>[] soundQueue = new Queue<byte>[2];
-        private byte latchedA, latchedB;
-        private int frequency, cyclesPerSample;
-        private int leftover = 0;
+        private readonly Memory _memory;
+        private readonly Queue<byte>[] _soundQueue = new Queue<byte>[2];
+        private byte _latchedA, _latchedB;
+        private int _frequency, _cyclesPerSample;
+        private int _leftover;
 
-        private short[] soundBuffer = new short[40000];
-        private int soundBufferPos = 0;
-        private int lastSoundBufferPos = 0;
+        private readonly short[] _soundBuffer = new short[40000];
+        private int _soundBufferPos;
+        private int _lastSoundBufferPos;
 
         public SoundManager(Memory memory, int frequency)
         {
-            this.Frequency = frequency;
+            Frequency = frequency;
 
-            this.memory = memory;
-            this.memory.IncrementSoundFifoA = this.IncrementFifoA;
-            this.memory.IncrementSoundFifoB = this.IncrementFifoB;
-            this.memory.ResetSoundFifoA = this.ResetFifoA;
-            this.memory.ResetSoundFifoB = this.ResetFifoB;
+            _memory = memory;
+            _memory.IncrementSoundFifoA = IncrementFifoA;
+            _memory.IncrementSoundFifoB = IncrementFifoB;
+            _memory.ResetSoundFifoA = ResetFifoA;
+            _memory.ResetSoundFifoB = ResetFifoB;
 
-            this.soundQueue[0] = new Queue<byte>(32);
-            this.soundQueue[1] = new Queue<byte>(32);
+            _soundQueue[0] = new Queue<byte>(32);
+            _soundQueue[1] = new Queue<byte>(32);
         }
 
         #region Public Properties
         public int Frequency
         {
-            get => this.frequency;
+            get => _frequency;
             set
             {
-                this.frequency = value;
-                this.cyclesPerSample = (Constants.CpuFreq << 5) / this.frequency;
+                _frequency = value;
+                _cyclesPerSample = (Constants.CpuFreq << 5) / _frequency;
             }
         }
 
-        public int QueueSizeA => this.soundQueue[0].Count;
+        public int QueueSizeA => _soundQueue[0].Count;
 
-        public int QueueSizeB => this.soundQueue[1].Count;
+        public int QueueSizeB => _soundQueue[1].Count;
 
         public int SamplesMixed
         {
             get
             {
-                int value = this.soundBufferPos - this.lastSoundBufferPos;
-                if (value < 0) value += this.soundBuffer.Length;
+                var value = _soundBufferPos - _lastSoundBufferPos;
+                if (value < 0) value += _soundBuffer.Length;
                 return value;
             }
         }
@@ -59,29 +58,29 @@ namespace GarboDev.Sound
         #region Public Methods
         public void GetSamples(short[] buffer, int length)
         {
-            for (int i = 0; i < length; i++)
+            for (var i = 0; i < length; i++)
             {
-                if (this.lastSoundBufferPos == this.soundBuffer.Length)
+                if (_lastSoundBufferPos == _soundBuffer.Length)
                 {
-                    this.lastSoundBufferPos = 0;
+                    _lastSoundBufferPos = 0;
                 }
-                buffer[i] = this.soundBuffer[this.lastSoundBufferPos++];
+                buffer[i] = _soundBuffer[_lastSoundBufferPos++];
             }
         }
 
         public void Mix(int cycles)
         {
-            ushort soundCntH = Memory.ReadU16(this.memory.IORam, Memory.SOUNDCNT_H);
-            ushort soundCntX = Memory.ReadU16(this.memory.IORam, Memory.SOUNDCNT_X);
+            var soundCntH = Memory.ReadU16(_memory.IORam, Memory.SOUNDCNT_H);
+            var soundCntX = Memory.ReadU16(_memory.IORam, Memory.SOUNDCNT_X);
 
             cycles <<= 5;
-            cycles += this.leftover;
+            cycles += _leftover;
 
             if (cycles > 0)
             {
                 // Precompute loop invariants
-                short directA = (short)(sbyte)(this.latchedA);
-                short directB = (short)(sbyte)(this.latchedB);
+                var directA = (short)(sbyte)(_latchedA);
+                var directB = (short)(sbyte)(_latchedB);
 
                 if ((soundCntH & (1 << 2)) == 0)
                 {
@@ -96,7 +95,7 @@ namespace GarboDev.Sound
                 {
                     short l = 0, r = 0;
 
-                    cycles -= this.cyclesPerSample;
+                    cycles -= _cyclesPerSample;
 
                     // Mixing
                     if ((soundCntX & (1 << 7)) != 0)
@@ -119,69 +118,69 @@ namespace GarboDev.Sound
                         }
                     }
 
-                    if (this.soundBufferPos == this.soundBuffer.Length)
+                    if (_soundBufferPos == _soundBuffer.Length)
                     {
-                        this.soundBufferPos = 0;
+                        _soundBufferPos = 0;
                     }
 
-                    this.soundBuffer[this.soundBufferPos++] = (short)(l << 6);
-                    this.soundBuffer[this.soundBufferPos++] = (short)(r << 6);
+                    _soundBuffer[_soundBufferPos++] = (short)(l << 6);
+                    _soundBuffer[_soundBufferPos++] = (short)(r << 6);
                 }
             }
 
-            this.leftover = cycles;
+            _leftover = cycles;
         }
 
         public void ResetFifoA()
         {
-            this.soundQueue[0].Clear();
-            this.latchedA = 0;
+            _soundQueue[0].Clear();
+            _latchedA = 0;
         }
 
         public void ResetFifoB()
         {
-            this.soundQueue[1].Clear();
-            this.latchedB = 0;
+            _soundQueue[1].Clear();
+            _latchedB = 0;
         }
 
         public void IncrementFifoA()
         {
-            for (int i = 0; i < 4; i++)
+            for (var i = 0; i < 4; i++)
             {
-                this.EnqueueDSoundSample(0, this.memory.IORam[Memory.FIFO_A_L + i]);
+                EnqueueDSoundSample(0, _memory.IORam[Memory.FIFO_A_L + i]);
             }
         }
 
         public void IncrementFifoB()
         {
-            for (int i = 0; i < 4; i++)
+            for (var i = 0; i < 4; i++)
             {
-                this.EnqueueDSoundSample(1, this.memory.IORam[Memory.FIFO_B_L + i]); 
+                EnqueueDSoundSample(1, _memory.IORam[Memory.FIFO_B_L + i]); 
             }
         }
 
         public void DequeueA()
         {
-            if (this.soundQueue[0].Count > 0)
+            if (_soundQueue[0].Count > 0)
             {
-                this.latchedA = this.soundQueue[0].Dequeue();
+                _latchedA = _soundQueue[0].Dequeue();
             }
         }
 
         public void DequeueB()
         {
-            if (this.soundQueue[1].Count > 0)
+            if (_soundQueue[1].Count > 0)
             {
-                this.latchedB = this.soundQueue[1].Dequeue();
+                _latchedB = _soundQueue[1].Dequeue();
             }
         }
         #endregion Public Methods
 
         private void EnqueueDSoundSample(int channel, byte sample)
         {
-            if (this.soundQueue[channel].Count < 32)
+            if (_soundQueue[channel].Count < 32)
             {
-                this.soundQueue[channel].Enqueue(sample);
+                _soundQueue[channel].Enqueue(sample);
             }
         }
     }

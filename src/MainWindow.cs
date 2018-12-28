@@ -15,158 +15,158 @@ namespace GarboDev.WinForms
 {
     partial class MainWindow : Form
     {
-        private DissassemblyWindow _disassembly = null;
-        private PaletteWindow palette = null;
-        private SpriteWindow sprites = null;
+        private DisassemblyWindow _disassembly;
+        private PaletteWindow _palette;
+        private SpriteWindow _sprites;
 
-        private GbaManager.GbaManager _gbaManager = null;
-        private readonly SoundPlayer soundPlayer = null;
+        private GbaManager.GbaManager _gbaManager;
+        private readonly SoundPlayer _soundPlayer;
 
-        private Device device = null;
+        private Device _device;
 
-        private VertexBuffer screenQuad = null;
-        private Texture backgroundTexture = null;
+        private VertexBuffer _screenQuad;
+        private Texture _backgroundTexture;
 
         private enum RendererType
         {
-            GDIRenderer,
+            GdiRenderer,
             D3DRenderer,
             ShaderRenderer
         }
 
-        private RendererType rendererType;
+        private RendererType _rendererType;
 
-        private int width, height;
+        private int _width, _height;
 
-        private string biosFilename;
+        private string _biosFilename;
 
         public MainWindow()
         {
             InitializeComponent();
 
-            this._gbaManager = new GbaManager.GbaManager();
+            _gbaManager = new GbaManager.GbaManager();
 
             // Initialize the sound subsystem
-            if (this.EnableSound.Checked)
+            if (EnableSound.Checked)
             {
-                this.soundPlayer = new SoundPlayer(this, this._gbaManager.AudioMixer, 2);
-                this.soundPlayer.Resume();
+                _soundPlayer = new SoundPlayer(this, _gbaManager.AudioMixer, 2);
+                _soundPlayer.Resume();
             }
 
             // Initialize the video subsystem
-            this.GetRenderTypeFromOptions();
-            this.SetRenderType(this.rendererType);
+            GetRenderTypeFromOptions();
+            SetRenderType(_rendererType);
 
-            this.width = 240 * 2;
-            this.height = 160 * 2;
-            this.ClientSize = new Size(this.width, this.height + this.MainMenu.Height + this.StatusStrip.Height);
+            _width = 240 * 2;
+            _height = 160 * 2;
+            ClientSize = new Size(_width, _height + MainMenu.Height + StatusStrip.Height);
 
-            Timer timer = new Timer {Interval = 50};
+            var timer = new Timer {Interval = 50};
             timer.Tick += UpdateFps;
             timer.Enabled = true;
 
-            this.biosFilename = "C:\\Documents and Settings\\Administrator\\My Documents\\Visual Studio\\Projects\\GarboDev\\gbabios.bin";
+            _biosFilename = "C:\\Documents and Settings\\Administrator\\My Documents\\Visual Studio\\Projects\\GarboDev\\gbabios.bin";
 
-            if (this.OptionsUseBios.Checked)
+            if (OptionsUseBios.Checked)
             {
-                this.LoadBios();
+                LoadBios();
             }
 
-            this.OptionsSkipBios.Checked = this._gbaManager.SkipBios;
-            this.OptionsLimitFps.Checked = this._gbaManager.LimitFps;
+            OptionsSkipBios.Checked = _gbaManager.SkipBios;
+            OptionsLimitFps.Checked = _gbaManager.LimitFps;
         }
 
         private void LoadBios()
         {
             try
             {
-                using (Stream stream = new FileStream(this.biosFilename, FileMode.Open))
+                using (Stream stream = new FileStream(_biosFilename, FileMode.Open))
                 {
-                    byte[] rom = new byte[(int)stream.Length];
+                    var rom = new byte[(int)stream.Length];
                     stream.Read(rom, 0, (int)stream.Length);
 
-                    this._gbaManager.LoadBios(rom);
+                    _gbaManager.LoadBios(rom);
                 }
             }
             catch (Exception exception)
             {
                 MessageBox.Show("Unable to load bios file, disabling bios (irq's will not work)\n" + exception.Message, "Error");
 
-                this.OptionsBiosFile.Checked = false;
+                OptionsBiosFile.Checked = false;
             }
         }
 
         private void UpdateFps(object sender, EventArgs e)
         {
-            if (this._gbaManager == null) return;
+            if (_gbaManager == null) return;
 
-            int t1 = this._gbaManager.FramesRendered;
-            double t2 = this._gbaManager.SecondsSinceStarted;
+            var t1 = _gbaManager.FramesRendered;
+            var t2 = _gbaManager.SecondsSinceStarted;
 
-            this.framesRendered.Enqueue(t1);
-            this.secondsSinceStarted.Enqueue(t2);
+            _framesRendered.Enqueue(t1);
+            _secondsSinceStarted.Enqueue(t2);
 
-            int frameDiff = t1 - this.framesRendered.Peek();
-            double timeDiff = t2 - this.secondsSinceStarted.Peek();
+            var frameDiff = t1 - _framesRendered.Peek();
+            var timeDiff = t2 - _secondsSinceStarted.Peek();
 
-            if (this.framesRendered.Count > 10)
+            if (_framesRendered.Count > 10)
             {
-                this.framesRendered.Dequeue();
-                this.secondsSinceStarted.Dequeue();
+                _framesRendered.Dequeue();
+                _secondsSinceStarted.Dequeue();
             }
 
-            this.StatusStrip.Items[0].Text = $"Fps: {frameDiff / timeDiff,2:f}";
+            StatusStrip.Items[0].Text = $"Fps: {frameDiff / timeDiff,2:f}";
         }
 
         protected override void OnResizeBegin(EventArgs e)
         {
-            this.Halt();
+            Halt();
         }
 
         protected override void OnResizeEnd(EventArgs e)
         {
-            if (!this.FilePause.Checked)
+            if (!FilePause.Checked)
             {
-                this.Resume();
+                Resume();
             }
         }
 
         protected override void OnResize(EventArgs e)
         {
-            this.width = this.ClientSize.Width;
-            this.height = this.ClientSize.Height - this.MainMenu.Height - this.StatusStrip.Height;
+            _width = ClientSize.Width;
+            _height = ClientSize.Height - MainMenu.Height - StatusStrip.Height;
 
-            if (this.screenQuad != null)
+            if (_screenQuad != null)
             {
-                this.OnScreenQuadCreated(this.screenQuad, null);
+                OnScreenQuadCreated(_screenQuad, null);
             }
         }
 
         public void Shutdown()
         {
-            this._gbaManager.Close();
-            this._gbaManager = null;
+            _gbaManager.Close();
+            _gbaManager = null;
 
-            soundPlayer?.Dispose();
+            _soundPlayer?.Dispose();
             _disassembly?.Close();
-            palette?.Close();
-            sprites?.Close();
+            _palette?.Close();
+            _sprites?.Close();
 
-            this.device.Dispose();
+            _device.Dispose();
         }
 
         private void InitializeD3D()
         {
             try
             {
-                PresentParameters presentParams = new PresentParameters {Windowed = true, SwapEffect = SwapEffect.Copy};
+                var presentParams = new PresentParameters {Windowed = true, SwapEffect = SwapEffect.Copy};
 
-                if (!this.OptionsVsync.Checked)
+                if (!OptionsVsync.Checked)
                 {
                     presentParams.PresentationInterval = PresentInterval.Immediate;
                 }
 
-                this.device = new Device(0, DeviceType.Hardware, this, CreateFlags.HardwareVertexProcessing,
+                _device = new Device(0, DeviceType.Hardware, this, CreateFlags.HardwareVertexProcessing,
                     presentParams);
             }
             catch (DirectXException exception)
@@ -175,14 +175,14 @@ namespace GarboDev.WinForms
                 throw exception;
             }
 
-            this.screenQuad = new VertexBuffer(typeof(CustomVertex.TransformedColoredTextured),
-                4, this.device, Usage.WriteOnly, CustomVertex.TransformedColoredTextured.Format, Pool.Default);
-            this.screenQuad.Created += new EventHandler(OnScreenQuadCreated);
-            this.OnScreenQuadCreated(this.screenQuad, null);
+            _screenQuad = new VertexBuffer(typeof(CustomVertex.TransformedColoredTextured),
+                4, _device, Usage.WriteOnly, CustomVertex.TransformedColoredTextured.Format, Pool.Default);
+            _screenQuad.Created += OnScreenQuadCreated;
+            OnScreenQuadCreated(_screenQuad, null);
 
-            if (this.rendererType == RendererType.D3DRenderer)
+            if (_rendererType == RendererType.D3DRenderer)
             {
-                this.backgroundTexture = new Texture(this.device, 240, 160, 1, Usage.None,
+                _backgroundTexture = new Texture(_device, 240, 160, 1, Usage.None,
                     Format.X8R8G8B8, Pool.Managed);
             }
         }
@@ -192,7 +192,7 @@ namespace GarboDev.WinForms
 
         public void CheckKeysHit()
         {
-            Keys[] keymap = new Keys[]
+            var keymap = new Keys[]
                 {
                     Keys.A,
                     Keys.B,
@@ -208,7 +208,7 @@ namespace GarboDev.WinForms
 
             ushort keyreg = 0x3FF;
 
-            for (int i = 0; i < keymap.Length; i++)
+            for (var i = 0; i < keymap.Length; i++)
             {
                 if (GetAsyncKeyState(keymap[i]) < 0)
                 {
@@ -220,254 +220,254 @@ namespace GarboDev.WinForms
                 }
             }
 
-            this._gbaManager.KeyState = keyreg;
+            _gbaManager.KeyState = keyreg;
         }
 
         private void GetRenderTypeFromOptions()
         {
-            if (this.OptionsRenderersD3D.Checked)
+            if (OptionsRenderersD3D.Checked)
             {
-                this.rendererType = RendererType.D3DRenderer;
+                _rendererType = RendererType.D3DRenderer;
             }
-            else if (this.OptionsRenderersShader.Checked)
+            else if (OptionsRenderersShader.Checked)
             {
-                this.rendererType = RendererType.ShaderRenderer;
+                _rendererType = RendererType.ShaderRenderer;
             }
-            else if (this.OptionsRenderersGDI.Checked)
+            else if (OptionsRenderersGDI.Checked)
             {
-                this.rendererType = RendererType.GDIRenderer;
+                _rendererType = RendererType.GdiRenderer;
             }
         }
 
         private void SetRenderType(RendererType rendererType)
         {
-            this.OptionsRenderersD3D.Checked = false;
-            this.OptionsRenderersShader.Checked = false;
-            this.OptionsRenderersGDI.Checked = false;
+            OptionsRenderersD3D.Checked = false;
+            OptionsRenderersShader.Checked = false;
+            OptionsRenderersGDI.Checked = false;
 
-            bool wasHalted = this._gbaManager.Halted;
-            this._gbaManager.Halt();
+            var wasHalted = _gbaManager.Halted;
+            _gbaManager.Halt();
 
-            if (this.device != null)
+            if (_device != null)
             {
-                this.device.Dispose();
+                _device.Dispose();
             }
 
-            this.rendererType = rendererType;
+            _rendererType = rendererType;
 
-            switch (this.rendererType)
+            switch (_rendererType)
             {
                 case RendererType.D3DRenderer:
-                    this.OptionsRenderersD3D.Checked = true;
+                    OptionsRenderersD3D.Checked = true;
 
-                    this.InitializeD3D();
-                    this._gbaManager.VideoManager.Presenter = this.RenderD3D;
+                    InitializeD3D();
+                    _gbaManager.VideoManager.Presenter = RenderD3D;
 
-                    Renderer renderer = new Renderer();
+                    var renderer = new Renderer();
                     renderer.Initialize(null);
 
-                    this._gbaManager.VideoManager.Renderer = renderer;
+                    _gbaManager.VideoManager.Renderer = renderer;
                     break;
 
-                case RendererType.GDIRenderer:
-                    this.OptionsRenderersGDI.Checked = true;
+                case RendererType.GdiRenderer:
+                    OptionsRenderersGDI.Checked = true;
 
                     new Bitmap(240, 160, PixelFormat.Format32bppRgb);
                     break;
 
                 case RendererType.ShaderRenderer:
-                    this.OptionsRenderersShader.Checked = true;
+                    OptionsRenderersShader.Checked = true;
 
-                    this.InitializeD3D();
-                    this._gbaManager.VideoManager.Presenter = this.RenderShader;
-                    this._gbaManager.Memory.EnableVramUpdating();
+                    InitializeD3D();
+                    _gbaManager.VideoManager.Presenter = RenderShader;
+                    _gbaManager.Memory.EnableVramUpdating();
 
-                    ShaderRenderer shaderRenderer = new ShaderRenderer();
-                    shaderRenderer.Initialize(this.device);
+                    var shaderRenderer = new ShaderRenderer();
+                    shaderRenderer.Initialize(_device);
 
-                    this._gbaManager.VideoManager.Renderer = shaderRenderer;
+                    _gbaManager.VideoManager.Renderer = shaderRenderer;
                     break;
             }
 
             if (!wasHalted)
             {
-                this._gbaManager.Resume();
+                _gbaManager.Resume();
             }
         }
 
-        private void RenderGDI(object data)
+        private void RenderGdi(object data)
         {
-            this.Invalidate();
+            Invalidate();
         }
 
         private void RenderShader(object data)
         {
-            if (this.device == null)
+            if (_device == null)
                 return;
 
-            this.device.Clear(ClearFlags.Target, Color.Black, 0.0f, 0);
+            _device.Clear(ClearFlags.Target, Color.Black, 0.0f, 0);
 
-            this.device.BeginScene();
+            _device.BeginScene();
 
-            this.device.SetTexture(0, data as Texture);
-            this.device.TextureState[0].ColorOperation = TextureOperation.Modulate;
-            this.device.TextureState[0].ColorArgument1 = TextureArgument.TextureColor;
-            this.device.TextureState[0].ColorArgument2 = TextureArgument.Diffuse;
-            this.device.TextureState[0].AlphaOperation = TextureOperation.Disable;
+            _device.SetTexture(0, data as Texture);
+            _device.TextureState[0].ColorOperation = TextureOperation.Modulate;
+            _device.TextureState[0].ColorArgument1 = TextureArgument.TextureColor;
+            _device.TextureState[0].ColorArgument2 = TextureArgument.Diffuse;
+            _device.TextureState[0].AlphaOperation = TextureOperation.Disable;
 
-            this.device.RenderState.CullMode = Cull.None;
-            this.device.RenderState.Lighting = false;
-            this.device.RenderState.ZBufferEnable = false;
+            _device.RenderState.CullMode = Cull.None;
+            _device.RenderState.Lighting = false;
+            _device.RenderState.ZBufferEnable = false;
 
-            this.device.SetStreamSource(0, this.screenQuad, 0);
-            this.device.VertexFormat = CustomVertex.TransformedColoredTextured.Format;
-            this.device.DrawPrimitives(PrimitiveType.TriangleFan, 0, 2);
+            _device.SetStreamSource(0, _screenQuad, 0);
+            _device.VertexFormat = CustomVertex.TransformedColoredTextured.Format;
+            _device.DrawPrimitives(PrimitiveType.TriangleFan, 0, 2);
 
-            this.device.SetStreamSource(0, null, 0);
+            _device.SetStreamSource(0, null, 0);
 
-            this.device.EndScene();
-            this.device.Present();
+            _device.EndScene();
+            _device.Present();
         }
 
         private void RenderD3D(object data)
         {
-            if (this.device == null)
+            if (_device == null)
                 return;
 
-            Surface surface = this.backgroundTexture.GetSurfaceLevel(0);
-            GraphicsStream stream = surface.LockRectangle(LockFlags.None);
+            var surface = _backgroundTexture.GetSurfaceLevel(0);
+            var stream = surface.LockRectangle(LockFlags.None);
             if (data is uint[] videoBuffer)
             {
                 stream.Write(videoBuffer);
             }
             surface.UnlockRectangle();
 
-            this.device.Clear(ClearFlags.Target, Color.White, 0.0f, 0);
-            this.device.BeginScene();
+            _device.Clear(ClearFlags.Target, Color.White, 0.0f, 0);
+            _device.BeginScene();
 
-            this.device.SetTexture(0, this.backgroundTexture);
-            this.device.TextureState[0].ColorOperation = TextureOperation.Modulate;
-            this.device.TextureState[0].ColorArgument1 = TextureArgument.TextureColor;
-            this.device.TextureState[0].ColorArgument2 = TextureArgument.Diffuse;
-            this.device.TextureState[0].AlphaOperation = TextureOperation.Disable;
+            _device.SetTexture(0, _backgroundTexture);
+            _device.TextureState[0].ColorOperation = TextureOperation.Modulate;
+            _device.TextureState[0].ColorArgument1 = TextureArgument.TextureColor;
+            _device.TextureState[0].ColorArgument2 = TextureArgument.Diffuse;
+            _device.TextureState[0].AlphaOperation = TextureOperation.Disable;
 
-            this.device.RenderState.CullMode = Cull.None;
-            this.device.RenderState.Lighting = false;
-            this.device.RenderState.ZBufferEnable = false;
+            _device.RenderState.CullMode = Cull.None;
+            _device.RenderState.Lighting = false;
+            _device.RenderState.ZBufferEnable = false;
 
-            this.device.SetStreamSource(0, this.screenQuad, 0);
-            this.device.VertexFormat = CustomVertex.TransformedColoredTextured.Format;
-            this.device.DrawPrimitives(PrimitiveType.TriangleFan, 0, 2);
+            _device.SetStreamSource(0, _screenQuad, 0);
+            _device.VertexFormat = CustomVertex.TransformedColoredTextured.Format;
+            _device.DrawPrimitives(PrimitiveType.TriangleFan, 0, 2);
 
-            this.device.SetStreamSource(0, null, 0);
+            _device.SetStreamSource(0, null, 0);
 
-            this.device.EndScene();
-            this.device.Present();
+            _device.EndScene();
+            _device.Present();
         }
 
-        private Queue<int> framesRendered = new Queue<int>();
-        private Queue<double> secondsSinceStarted = new Queue<double>();
+        private readonly Queue<int> _framesRendered = new Queue<int>();
+        private readonly Queue<double> _secondsSinceStarted = new Queue<double>();
 
         private void FileOpen_Click(object sender, EventArgs e)
         {
-            OpenFileDialog dialog = new OpenFileDialog();
+            var dialog = new OpenFileDialog();
 
             dialog.Filter = "bin files (*.bin;*.gba)|*.bin;*.gba|All files (*.*)|*.*";
             dialog.FilterIndex = 0;
 
             if (dialog.ShowDialog() == DialogResult.OK)
             {
-                using (Stream stream = dialog.OpenFile())
+                using (var stream = dialog.OpenFile())
                 {
-                    int romSize = 1;
+                    var romSize = 1;
                     while (romSize < stream.Length)
                     {
                         romSize <<= 1;
                     }
 
-                    byte[] rom = new byte[romSize];
+                    var rom = new byte[romSize];
                     stream.Read(rom, 0, (int)stream.Length);
 
-                    this._gbaManager.LoadRom(rom);
+                    _gbaManager.LoadRom(rom);
                 }
 
-                if (!this.FilePause.Checked)
+                if (!FilePause.Checked)
                 {
-                    this.Resume();
+                    Resume();
                 }
             }
         }
 
         private void FileExit_Click(object sender, EventArgs e)
         {
-            this.Close();
+            Close();
         }
 
         protected override void OnClosing(CancelEventArgs e)
         {
-            if (this._gbaManager != null)
+            if (_gbaManager != null)
             {
                 e.Cancel = true;
 
-                this.Shutdown();
+                Shutdown();
 
-                this.Close();
+                Close();
             }
         }
 
         protected override void OnActivated(EventArgs e)
         {
-            if (!this.FilePause.Checked)
+            if (!FilePause.Checked)
             {
-                this.Resume();
+                Resume();
             }
         }
 
         protected override void OnLostFocus(EventArgs e)
         {
-            if (this._gbaManager != null)
+            if (_gbaManager != null)
             {
-                this.Halt();
+                Halt();
             }
         }
 
         private void DebugDissassembly_Click(object sender, EventArgs e)
         {
-            this._disassembly = new DissassemblyWindow(this._gbaManager);
-            this._disassembly.Show();
+            _disassembly = new DisassemblyWindow(_gbaManager);
+            _disassembly.Show();
 
-            this._disassembly.Location = new Point(this.Location.X + this.Width + 15, this.Location.Y);
+            _disassembly.Location = new Point(Location.X + Width + 15, Location.Y);
         }
 
         private void DebugPalette_Click(object sender, EventArgs e)
         {
-            this.palette = new PaletteWindow(this._gbaManager);
-            this.palette.Show();
+            _palette = new PaletteWindow(_gbaManager);
+            _palette.Show();
         }
 
         private void DebugSprites_Click(object sender, EventArgs e)
         {
-            this.sprites = new SpriteWindow(this._gbaManager);
-            this.sprites.Show();
+            _sprites = new SpriteWindow(_gbaManager);
+            _sprites.Show();
         }
 
         private void OnScreenQuadCreated(object sender, EventArgs e)
         {
-            VertexBuffer vb = (VertexBuffer)sender;
-            CustomVertex.TransformedColoredTextured[] verts = (CustomVertex.TransformedColoredTextured[])vb.Lock(0, 0);
+            var vb = (VertexBuffer)sender;
+            var verts = (CustomVertex.TransformedColoredTextured[])vb.Lock(0, 0);
 
-            float topx = 0, topy = this.MainMenu.Height;
+            float topx = 0, topy = MainMenu.Height;
 
             verts[0].Position = new Vector4(topx - 0.5f, topy - 0.5f, 0, 1);
             verts[0].Color = Color.White.ToArgb();
             verts[0].Tu = 0; verts[0].Tv = 0;
-            verts[1].Position = new Vector4(topx + this.width - 0.5f, topy - 0.5f, 0, 1);
+            verts[1].Position = new Vector4(topx + _width - 0.5f, topy - 0.5f, 0, 1);
             verts[1].Color = Color.White.ToArgb();
             verts[1].Tu = 1; verts[1].Tv = 0;
-            verts[2].Position = new Vector4(topx + this.width - 0.5f, topy + this.height - 0.5f, 0, 1);
+            verts[2].Position = new Vector4(topx + _width - 0.5f, topy + _height - 0.5f, 0, 1);
             verts[2].Color = Color.White.ToArgb();
             verts[2].Tu = 1; verts[2].Tv = 1;
-            verts[3].Position = new Vector4(topx - 0.5f, topy + this.height - 0.5f, 0, 1);
+            verts[3].Position = new Vector4(topx - 0.5f, topy + _height - 0.5f, 0, 1);
             verts[3].Color = Color.White.ToArgb();
             verts[3].Tu = 0; verts[3].Tv = 1;
 
@@ -476,55 +476,56 @@ namespace GarboDev.WinForms
 
         private void FilePause_Click(object sender, EventArgs e)
         {
-            if (!this.FilePause.Checked)
+            if (!FilePause.Checked)
             {
-                this.Resume();
+                Resume();
             }
             else
             {
-                this.Halt();
-                this.device.Present();
+                Halt();
+                _device.Present();
             }
         }
 
         private void FileReset_Click(object sender, EventArgs e)
         {
-            this.soundPlayer.Pause();
-            this._gbaManager.Reset();
+            _soundPlayer.Pause();
+            _gbaManager.Reset();
 
-            if (!this.FilePause.Checked)
+            if (!FilePause.Checked)
             {
-                this.Resume();
+                Resume();
             }
         }
 
         private void OptionsBiosFile_Click(object sender, EventArgs e)
         {
-            OpenFileDialog dialog = new OpenFileDialog();
-
-            dialog.Filter = "bin files (*.bin;*.gba)|*.bin;*.gba|All files (*.*)|*.*";
-            dialog.FilterIndex = 0;
-            dialog.FileName = this.biosFilename;
+            var dialog = new OpenFileDialog
+            {
+                Filter = "bin files (*.bin;*.gba)|*.bin;*.gba|All files (*.*)|*.*",
+                FilterIndex = 0,
+                FileName = _biosFilename
+            };
 
             if (dialog.ShowDialog() == DialogResult.OK)
             {
-                this.biosFilename = dialog.FileName;
-                this.LoadBios();
+                _biosFilename = dialog.FileName;
+                LoadBios();
             }
         }
 
         private void OptionsSkipBios_Click(object sender, EventArgs e)
         {
-            this._gbaManager.SkipBios = this.OptionsSkipBios.Checked;
+            _gbaManager.SkipBios = OptionsSkipBios.Checked;
         }
 
         private void OptionsVsync_Click(object sender, EventArgs e)
         {
-            if (this.device != null)
+            if (_device != null)
             {
-                PresentParameters parameters = this.device.PresentationParameters;
+                var parameters = _device.PresentationParameters;
 
-                if (this.OptionsVsync.Checked)
+                if (OptionsVsync.Checked)
                 {
                     parameters.PresentationInterval = PresentInterval.Default;
                 }
@@ -533,87 +534,87 @@ namespace GarboDev.WinForms
                     parameters.PresentationInterval = PresentInterval.Immediate;
                 }
 
-                this.Halt();
-                this.device.Reset(parameters);
-                this.Resume();
+                Halt();
+                _device.Reset(parameters);
+                Resume();
             }
         }
 
         private void OptionsLimitFps_Click(object sender, EventArgs e)
         {
-            this._gbaManager.LimitFps = this.OptionsLimitFps.Checked;
+            _gbaManager.LimitFps = OptionsLimitFps.Checked;
         }
 
         private void OptionsRenderersD3D_Click(object sender, EventArgs e)
         {
-            this.SetRenderType(RendererType.D3DRenderer);
+            SetRenderType(RendererType.D3DRenderer);
         }
 
         private void OptionsRenderersShader_Click(object sender, EventArgs e)
         {
-            this.SetRenderType(RendererType.ShaderRenderer);
+            SetRenderType(RendererType.ShaderRenderer);
         }
 
         private void OptionsRenderersGDI_Click(object sender, EventArgs e)
         {
-            this.SetRenderType(RendererType.GDIRenderer);
+            SetRenderType(RendererType.GdiRenderer);
         }
 
         private void OptionsSizex1_Click(object sender, EventArgs e)
         {
-            this.ResizeWindow(1, 1);
+            ResizeWindow(1, 1);
         }
 
         private void OptionsSizex2_Click(object sender, EventArgs e)
         {
-            this.ResizeWindow(2, 2);
+            ResizeWindow(2, 2);
         }
 
         private void OptionsSizex3_Click(object sender, EventArgs e)
         {
-            this.ResizeWindow(3, 3);
+            ResizeWindow(3, 3);
         }
 
         private void ResizeWindow(int xScale, int yScale)
         {
-            this.width = 240 * xScale;
-            this.height = 160 * yScale;
+            _width = 240 * xScale;
+            _height = 160 * yScale;
 
-            this.Halt();
+            Halt();
 
-            this.ClientSize = new Size(this.width, this.height + this.MainMenu.Height + this.StatusStrip.Height);
+            ClientSize = new Size(_width, _height + MainMenu.Height + StatusStrip.Height);
 
-            if (!this.FilePause.Checked)
+            if (!FilePause.Checked)
             {
-                this.Resume();
+                Resume();
             }
         }
 
         private void Halt()
         {
-            this.soundPlayer.Pause();
-            this._gbaManager.Halt();
+            _soundPlayer.Pause();
+            _gbaManager.Halt();
         }
 
         private void Resume()
         {
-            this._gbaManager.Resume();
-            if (this.EnableSound.Checked)
+            _gbaManager.Resume();
+            if (EnableSound.Checked)
             {
-                this.soundPlayer.Resume();
+                _soundPlayer.Resume();
             }
         }
 
         private void enableSoundToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            this.EnableSound.Checked = !this.EnableSound.Checked;
-            if (!this.EnableSound.Checked)
+            EnableSound.Checked = !EnableSound.Checked;
+            if (!EnableSound.Checked)
             {
-                this.soundPlayer.Pause();
+                _soundPlayer.Pause();
             }
             else
             {
-                this.soundPlayer.Resume();
+                _soundPlayer.Resume();
             }
         }
     }

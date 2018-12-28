@@ -10,28 +10,28 @@ namespace GarboDev.Graphics
 
         public delegate void OnPresent(object data);
 
-        private Memory memory = null;
-        private IRenderer renderer = null;
+        private Memory memory;
+        private IRenderer renderer;
         private OnPresent presenter;
         private int curLine;
 
         public Memory Memory
         {
-            set{ this.memory = value; }
+            set => memory = value;
         }
 
         public IRenderer Renderer
         {
             set
             {
-                this.renderer = value;
-                this.renderer.Memory = this.memory;
+                renderer = value;
+                renderer.Memory = memory;
             }
         }
 
         public OnPresent Presenter
         {
-            set { this.presenter = value; }
+            set => presenter = value;
         }
 
         public VideoManager(Action onFramesRendered)
@@ -41,21 +41,21 @@ namespace GarboDev.Graphics
 
         public void Reset()
         {
-            this.curLine = 0;
+            curLine = 0;
 
-            this.renderer.Memory = memory;
-            this.renderer.Reset();
+            renderer.Memory = memory;
+            renderer.Reset();
         }
 
         private void EnterVBlank(Arm7Processor processor)
         {
-            ushort dispstat = Memory.ReadU16(this.memory.IORam, Memory.DISPSTAT);
+            var dispstat = Memory.ReadU16(memory.IORam, Memory.DISPSTAT);
             dispstat |= 1;
-            Memory.WriteU16(this.memory.IORam, Memory.DISPSTAT, dispstat);
+            Memory.WriteU16(memory.IORam, Memory.DISPSTAT, dispstat);
 
             // Render the frame
             _onFramesRendered();
-            this.presenter(this.renderer.ShowFrame());
+            presenter(renderer.ShowFrame());
 
             if ((dispstat & (1 << 3)) != 0)
             {
@@ -64,42 +64,42 @@ namespace GarboDev.Graphics
             }
 
             // Check for DMA triggers
-            this.memory.VBlankDma();
+            memory.VBlankDma();
         }
 
         private void LeaveVBlank(Arm7Processor processor)
         {
-            ushort dispstat = Memory.ReadU16(this.memory.IORam, Memory.DISPSTAT);
+            var dispstat = Memory.ReadU16(memory.IORam, Memory.DISPSTAT);
             dispstat &= 0xFFFE;
-            Memory.WriteU16(this.memory.IORam, Memory.DISPSTAT, dispstat);
+            Memory.WriteU16(memory.IORam, Memory.DISPSTAT, dispstat);
 
             processor.UpdateKeyState();
 
             // Update the rot/scale values
-            this.memory.Bgx[0] = (int)Memory.ReadU32(this.memory.IORam, Memory.BG2X_L);
-            this.memory.Bgx[1] = (int)Memory.ReadU32(this.memory.IORam, Memory.BG3X_L);
-            this.memory.Bgy[0] = (int)Memory.ReadU32(this.memory.IORam, Memory.BG2Y_L);
-            this.memory.Bgy[1] = (int)Memory.ReadU32(this.memory.IORam, Memory.BG3Y_L);
+            memory.Bgx[0] = (int)Memory.ReadU32(memory.IORam, Memory.BG2X_L);
+            memory.Bgx[1] = (int)Memory.ReadU32(memory.IORam, Memory.BG3X_L);
+            memory.Bgy[0] = (int)Memory.ReadU32(memory.IORam, Memory.BG2Y_L);
+            memory.Bgy[1] = (int)Memory.ReadU32(memory.IORam, Memory.BG3Y_L);
         }
 
         public void EnterHBlank(Arm7Processor processor)
         {
-            ushort dispstat = Memory.ReadU16(this.memory.IORam, Memory.DISPSTAT);
+            var dispstat = Memory.ReadU16(memory.IORam, Memory.DISPSTAT);
             dispstat |= 1 << 1;
-            Memory.WriteU16(this.memory.IORam, Memory.DISPSTAT, dispstat);
+            Memory.WriteU16(memory.IORam, Memory.DISPSTAT, dispstat);
 
             // Advance the bgx registers
-            for (int bg = 0; bg <= 1; bg++)
+            for (var bg = 0; bg <= 1; bg++)
             {
-                short dmx = (short)Memory.ReadU16(this.memory.IORam, Memory.BG2PB + (uint)bg * 0x10);
-                short dmy = (short)Memory.ReadU16(this.memory.IORam, Memory.BG2PD + (uint)bg * 0x10);
-                this.memory.Bgx[bg] += dmx;
-                this.memory.Bgy[bg] += dmy;
+                var dmx = (short)Memory.ReadU16(memory.IORam, Memory.BG2PB + (uint)bg * 0x10);
+                var dmy = (short)Memory.ReadU16(memory.IORam, Memory.BG2PD + (uint)bg * 0x10);
+                memory.Bgx[bg] += dmx;
+                memory.Bgy[bg] += dmy;
             }
 
-            if (this.curLine < 160)
+            if (curLine < 160)
             {
-                this.memory.HBlankDma();
+                memory.HBlankDma();
 
                 // Trigger hblank irq
                 if ((dispstat & (1 << 4)) != 0)
@@ -111,37 +111,37 @@ namespace GarboDev.Graphics
 
         public void LeaveHBlank(Arm7Processor processor)
         {
-            ushort dispstat = Memory.ReadU16(this.memory.IORam, Memory.DISPSTAT);
+            var dispstat = Memory.ReadU16(memory.IORam, Memory.DISPSTAT);
             dispstat &= 0xFFF9;
-            Memory.WriteU16(this.memory.IORam, Memory.DISPSTAT, dispstat);
+            Memory.WriteU16(memory.IORam, Memory.DISPSTAT, dispstat);
 
             // Move to the next line
-            this.curLine++;
+            curLine++;
 
-            if (this.curLine >= 228)
+            if (curLine >= 228)
             {
                 // Start again at the beginning
-                this.curLine = 0;
+                curLine = 0;
             }
 
             // Update registers
-            Memory.WriteU16(this.memory.IORam, Memory.VCOUNT, (ushort)this.curLine);
+            Memory.WriteU16(memory.IORam, Memory.VCOUNT, (ushort)curLine);
 
             // Check for vblank
-            if (this.curLine == 160)
+            if (curLine == 160)
             {
-                this.EnterVBlank(processor);
+                EnterVBlank(processor);
             }
-            else if (this.curLine == 0)
+            else if (curLine == 0)
             {
-                this.LeaveVBlank(processor);
+                LeaveVBlank(processor);
             }
 
             // Check y-line trigger
-            if (((dispstat >> 8) & 0xff) == this.curLine)
+            if (((dispstat >> 8) & 0xff) == curLine)
             {
-                dispstat = (ushort)(Memory.ReadU16(this.memory.IORam, Memory.DISPSTAT) | (1 << 2));
-                Memory.WriteU16(this.memory.IORam, Memory.DISPSTAT, dispstat);
+                dispstat = (ushort)(Memory.ReadU16(memory.IORam, Memory.DISPSTAT) | (1 << 2));
+                Memory.WriteU16(memory.IORam, Memory.DISPSTAT, dispstat);
 
                 if ((dispstat & (1 << 5)) != 0)
                 {
@@ -152,9 +152,9 @@ namespace GarboDev.Graphics
 
         public void RenderLine()
         {
-            if (this.curLine < 160)
+            if (curLine < 160)
             {
-                this.renderer.RenderLine(this.curLine);
+                renderer.RenderLine(curLine);
             }
         }
     }

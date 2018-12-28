@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Runtime.CompilerServices;
 using GarboDev.Cores.InterpretedCore;
 using GarboDev.CrossCutting;
 using GarboDev.Sound;
@@ -9,14 +8,13 @@ namespace GarboDev.Cores
 {
     public class Arm7Processor
     {
-        private Memory memory = null;
-        private SoundManager sound = null;
-        private FastArmCore armCore = null;
-        private ThumbCore thumbCore = null;
+        private readonly Memory _memory;
+        private readonly SoundManager _sound;
+        private readonly FastArmCore _armCore;
+        private readonly ThumbCore _thumbCore;
 
-        private int cycles = 0;
-        private int timerCycles = 0;
-        private int soundCycles = 0;
+        private int _timerCycles;
+        private int _soundCycles;
 
         // CPU mode definitions
         public const uint USR = 0x10;
@@ -36,68 +34,52 @@ namespace GarboDev.Cores
         public const int F_BIT = 6;
         public const int T_BIT = 5;
 
-        public const uint N_MASK = (uint)(1U << N_BIT);
-        public const uint Z_MASK = (uint)(1U << Z_BIT);
-        public const uint C_MASK = (uint)(1U << C_BIT);
-        public const uint V_MASK = (uint)(1U << V_BIT);
-        public const uint I_MASK = (uint)(1U << I_BIT);
-        public const uint F_MASK = (uint)(1U << F_BIT);
-        public const uint T_MASK = (uint)(1U << T_BIT);
+        public const uint N_MASK = 1U << N_BIT;
+        public const uint Z_MASK = 1U << Z_BIT;
+        public const uint C_MASK = 1U << C_BIT;
+        public const uint V_MASK = 1U << V_BIT;
+        public const uint I_MASK = 1U << I_BIT;
+        public const uint F_MASK = 1U << F_BIT;
+        public const uint T_MASK = 1U << T_BIT;
 
         // Standard registers
-        private uint[] registers = new uint[16];
-        private uint cpsr = 0;
 
         // Banked registers
-        private uint[] bankedFIQ = new uint[7];
-        private uint[] bankedIRQ = new uint[2];
-        private uint[] bankedSVC = new uint[2];
-        private uint[] bankedABT = new uint[2];
-        private uint[] bankedUND = new uint[2];
+        private readonly uint[] bankedFIQ = new uint[7];
+        private readonly uint[] bankedIRQ = new uint[2];
+        private readonly uint[] bankedSVC = new uint[2];
+        private readonly uint[] bankedABT = new uint[2];
+        private readonly uint[] bankedUND = new uint[2];
 
         // Saved CPSR's
-        private uint spsrFIQ = 0;
-        private uint spsrIRQ = 0;
-        private uint spsrSVC = 0;
-        private uint spsrABT = 0;
-        private uint spsrUND = 0;
+        private uint _spsrFiq;
+        private uint _spsrIrq;
+        private uint _spsrSvc;
+        private uint _spsrAbt;
+        private uint _spsrUnd;
 
-        private ushort keyState;
+        private ushort _keyState;
 
-        private bool cpuHalted = false;
+        private bool _cpuHalted;
 
         public ushort KeyState
         {
-            set { this.keyState = value; }
+            set => _keyState = value;
         }
 
-        public int Cycles
-        {
-            get { return this.cycles; }
-            set { this.cycles = value; }
-        }
+        public int Cycles { get; set; }
 
-        public bool ArmState
-        {
-            get { return (this.cpsr & Arm7Processor.T_MASK) != Arm7Processor.T_MASK; }
-        }
+        public bool ArmState => (CPSR & T_MASK) != T_MASK;
 
-        public uint[] Registers
-        {
-            get { return this.registers; }
-        }
+        public uint[] Registers { get; } = new uint[16];
 
-        public uint CPSR
-        {
-            get { return this.cpsr; }
-            set { this.cpsr = value; }
-        }
+        public uint CPSR { get; set; }
 
         public bool SPSRExists
         {
             get
             {
-                switch (this.cpsr & 0x1F)
+                switch (CPSR & 0x1F)
                 {
                     case USR:
                     case SYS:
@@ -118,46 +100,46 @@ namespace GarboDev.Cores
         {
             get
             {
-                switch (this.cpsr & 0x1F)
+                switch (CPSR & 0x1F)
                 {
                     case USR:
                     case SYS:
                         return 0xFFFFFFFF;
                     case FIQ:
-                        return this.spsrFIQ;
+                        return _spsrFiq;
                     case SVC:
-                        return this.spsrSVC;
+                        return _spsrSvc;
                     case ABT:
-                        return this.spsrABT;
+                        return _spsrAbt;
                     case IRQ:
-                        return this.spsrIRQ;
+                        return _spsrIrq;
                     case UND:
-                        return this.spsrUND;
+                        return _spsrUnd;
                     default:
                         throw new Exception("Unhandled CPSR state...");
                 }
             }
             set
             {
-                switch (this.cpsr & 0x1F)
+                switch (CPSR & 0x1F)
                 {
                     case USR:
                     case SYS:
                         break;
                     case FIQ:
-                        this.spsrFIQ = value;
+                        _spsrFiq = value;
                         break;
                     case SVC:
-                        this.spsrSVC = value;
+                        _spsrSvc = value;
                         break;
                     case ABT:
-                        this.spsrABT = value;
+                        _spsrAbt = value;
                         break;
                     case IRQ:
-                        this.spsrIRQ = value;
+                        _spsrIrq = value;
                         break;
                     case UND:
-                        this.spsrUND = value;
+                        _spsrUnd = value;
                         break;
                     default:
                         throw new Exception("Unhandled CPSR state...");
@@ -165,34 +147,34 @@ namespace GarboDev.Cores
             }
         }
 
-        public Dictionary<uint, bool> Breakpoints { get; } = null;
+        public Dictionary<uint, bool> Breakpoints { get; }
 
-        public bool BreakpointHit { get; set; } = false;
+        public bool BreakpointHit { get; set; }
 
         public Arm7Processor(Memory memory, SoundManager sound)
         {
-            this.memory = memory;
-            this.sound = sound;
+            _memory = memory;
+            _sound = sound;
 
             // Processor callbacks
-            this.memory.ArmProcessorState = () => this.ArmState;
-            this.memory.RequestProcessorIrq = this.RequestIrq;
-            this.memory.UpdateProcessorTimers = this.UpdateTimers;
-            this.memory.HaltProcessor = this.Halt;
-            this.memory.GetProcessorRegister15 = () => this.registers[15];
+            _memory.ArmProcessorState = () => ArmState;
+            _memory.RequestProcessorIrq = RequestIrq;
+            _memory.UpdateProcessorTimers = UpdateTimers;
+            _memory.HaltProcessor = Halt;
+            _memory.GetProcessorRegister15 = () => Registers[15];
 
-            this.armCore = new FastArmCore(this, this.memory);
-            this.thumbCore = new ThumbCore(this, this.memory);
-            this.Breakpoints = new Dictionary<uint, bool>();
-            this.BreakpointHit = false;
+            _armCore = new FastArmCore(this, _memory);
+            _thumbCore = new ThumbCore(this, _memory);
+            Breakpoints = new Dictionary<uint, bool>();
+            BreakpointHit = false;
         }
 
         private void SwapRegsHelper(uint[] swapRegs)
         {
-            for (int i = 14; i > 14 - swapRegs.Length; i--)
+            for (var i = 14; i > 14 - swapRegs.Length; i--)
             {
-                uint tmp = this.registers[i];
-                this.registers[i] = swapRegs[swapRegs.Length - (14 - i) - 1];
+                var tmp = Registers[i];
+                Registers[i] = swapRegs[swapRegs.Length - (14 - i) - 1];
                 swapRegs[swapRegs.Length - (14 - i) - 1] = tmp;
             }
         }
@@ -202,144 +184,144 @@ namespace GarboDev.Cores
             switch (bank & 0x1F)
             {
                 case FIQ:
-                    this.SwapRegsHelper(this.bankedFIQ);
+                    SwapRegsHelper(bankedFIQ);
                     break;
                 case SVC:
-                    this.SwapRegsHelper(this.bankedSVC);
+                    SwapRegsHelper(bankedSVC);
                     break;
                 case ABT:
-                    this.SwapRegsHelper(this.bankedABT);
+                    SwapRegsHelper(bankedABT);
                     break;
                 case IRQ:
-                    this.SwapRegsHelper(this.bankedIRQ);
+                    SwapRegsHelper(bankedIRQ);
                     break;
                 case UND:
-                    this.SwapRegsHelper(this.bankedUND);
+                    SwapRegsHelper(bankedUND);
                     break;
             }
         }
 
         public void WriteCpsr(uint newCpsr)
         {
-            if ((newCpsr & 0x1F) != (this.cpsr & 0x1F))
+            if ((newCpsr & 0x1F) != (CPSR & 0x1F))
             {
                 // Swap out the old registers
-                this.SwapRegisters(this.cpsr);
+                SwapRegisters(CPSR);
                 // Swap in the new registers
-                this.SwapRegisters(newCpsr);
+                SwapRegisters(newCpsr);
             }
 
-            this.cpsr = newCpsr;
+            CPSR = newCpsr;
         }
 
         public void EnterException(uint mode, uint vector, bool interruptsDisabled, bool fiqDisabled)
         {
-            uint oldCpsr = this.cpsr;
+            var oldCpsr = CPSR;
 
-            if ((oldCpsr & Arm7Processor.T_MASK) != 0)
+            if ((oldCpsr & T_MASK) != 0)
             {
-                registers[15] += 2U;
+                Registers[15] += 2U;
             }
 
             // Clear T bit, and set mode
-            uint newCpsr = (oldCpsr & ~0x3FU) | mode;
+            var newCpsr = (oldCpsr & ~0x3FU) | mode;
             if (interruptsDisabled) newCpsr |= 1 << 7;
             if (fiqDisabled) newCpsr |= 1 << 6;
-            this.WriteCpsr(newCpsr);
+            WriteCpsr(newCpsr);
 
-            this.SPSR = oldCpsr;
-            registers[14] = registers[15];
-            registers[15] = vector;
+            SPSR = oldCpsr;
+            Registers[14] = Registers[15];
+            Registers[15] = vector;
 
-            this.ReloadQueue();
+            ReloadQueue();
         }
 
         public void RequestIrq(int irq)
         {
-            ushort iflag = Memory.ReadU16(this.memory.IORam, Memory.IF);
+            var iflag = Memory.ReadU16(_memory.IORam, Memory.IF);
             iflag |= (ushort)(1 << irq);
-            Memory.WriteU16(this.memory.IORam, Memory.IF, iflag);
+            Memory.WriteU16(_memory.IORam, Memory.IF, iflag);
         }
 
         public void FireIrq()
         {
-            ushort ime = Memory.ReadU16(this.memory.IORam, Memory.IME);
-            ushort ie = Memory.ReadU16(this.memory.IORam, Memory.IE);
-            ushort iflag = Memory.ReadU16(this.memory.IORam, Memory.IF);
+            var ime = Memory.ReadU16(_memory.IORam, Memory.IME);
+            var ie = Memory.ReadU16(_memory.IORam, Memory.IE);
+            var iflag = Memory.ReadU16(_memory.IORam, Memory.IF);
 
-            if ((ie & (iflag)) != 0 && (ime & 1) != 0 && (this.cpsr & (1 << 7)) == 0)
+            if ((ie & (iflag)) != 0 && (ime & 1) != 0 && (CPSR & (1 << 7)) == 0)
             {
                 // Off to the irq exception vector
-                this.EnterException(Arm7Processor.IRQ, 0x18, true, false);
+                EnterException(IRQ, 0x18, true, false);
             }
         }
 
         public void Reset(bool skipBios)
         {
-            this.BreakpointHit = false;
-            this.cpuHalted = false;
+            BreakpointHit = false;
+            _cpuHalted = false;
 
             // Default to ARM state
-            this.cycles = 0;
-            this.timerCycles = 0;
-            this.soundCycles = 0;
+            Cycles = 0;
+            _timerCycles = 0;
+            _soundCycles = 0;
 
-            this.bankedSVC[0] = 0x03007FE0;
-            this.bankedIRQ[0] = 0x03007FA0;
+            bankedSVC[0] = 0x03007FE0;
+            bankedIRQ[0] = 0x03007FA0;
 
-            this.cpsr = SYS;
-            this.spsrSVC = this.cpsr;
-            for (int i = 0; i < 15; i++) this.registers[i] = 0;
+            CPSR = SYS;
+            _spsrSvc = CPSR;
+            for (var i = 0; i < 15; i++) Registers[i] = 0;
 
             if (skipBios)
             {
-                this.registers[15] = 0x8000000;
+                Registers[15] = 0x8000000;
             }
             else
             {
-                this.registers[15] = 0;
+                Registers[15] = 0;
             }
 
-            this.armCore.BeginExecution();
+            _armCore.BeginExecution();
         }
 
         public void Halt()
         {
-            this.cpuHalted = true;
-            this.cycles = 0;
+            _cpuHalted = true;
+            Cycles = 0;
         }
 
         public void Step()
         {
-            this.BreakpointHit = false;
+            BreakpointHit = false;
 
-            if ((this.cpsr & Arm7Processor.T_MASK) == Arm7Processor.T_MASK)
+            if ((CPSR & T_MASK) == T_MASK)
             {
-                this.thumbCore.Step();
+                _thumbCore.Step();
             }
             else
             {
-                this.armCore.Step();
+                _armCore.Step();
             }
 
-            this.UpdateTimers();
+            UpdateTimers();
         }
 
         public void ReloadQueue()
         {
-            if ((this.cpsr & Arm7Processor.T_MASK) == Arm7Processor.T_MASK)
+            if ((CPSR & T_MASK) == T_MASK)
             {
-                this.thumbCore.BeginExecution();
+                _thumbCore.BeginExecution();
             }
             else
             {
-                this.armCore.BeginExecution();
+                _armCore.BeginExecution();
             }
         }
 
         private void UpdateTimer(int timer, int cycles, bool countUp)
         {
-            ushort control = Memory.ReadU16(this.memory.IORam, Memory.TM0CNT + (uint)(timer * 4));
+            var control = Memory.ReadU16(_memory.IORam, Memory.TM0CNT + (uint)(timer * 4));
 
             // Make sure timer is enabled, or count up is disabled
             if ((control & (1 << 7)) == 0) return;
@@ -356,24 +338,24 @@ namespace GarboDev.Cores
                 }
             }
 
-            this.memory.TimerCnt[timer] += (uint)cycles;
-            uint timerCnt = this.memory.TimerCnt[timer] >> 10;
+            _memory.TimerCnt[timer] += (uint)cycles;
+            var timerCnt = _memory.TimerCnt[timer] >> 10;
 
             if (timerCnt > 0xffff)
             {
-                ushort soundCntX = Memory.ReadU16(this.memory.IORam, Memory.SOUNDCNT_X);
+                var soundCntX = Memory.ReadU16(_memory.IORam, Memory.SOUNDCNT_X);
                 if ((soundCntX & (1 << 7)) != 0)
                 {
-                    ushort soundCntH = Memory.ReadU16(this.memory.IORam, Memory.SOUNDCNT_H);
+                    var soundCntH = Memory.ReadU16(_memory.IORam, Memory.SOUNDCNT_H);
                     if (timer == ((soundCntH >> 10) & 1))
                     {
                         // FIFO A overflow
-                        this.sound.DequeueA();
-                        if (this.sound.QueueSizeA < 16)
+                        _sound.DequeueA();
+                        if (_sound.QueueSizeA < 16)
                         {
-                            this.memory.FifoDma(1);
+                            _memory.FifoDma(1);
                             // TODO
-                            if (this.sound.QueueSizeA < 16)
+                            if (_sound.QueueSizeA < 16)
                             {
                             }
                         }
@@ -381,10 +363,10 @@ namespace GarboDev.Cores
                     if (timer == ((soundCntH >> 14) & 1))
                     {
                         // FIFO B overflow
-                        this.sound.DequeueB();
-                        if (this.sound.QueueSizeB < 16)
+                        _sound.DequeueB();
+                        if (_sound.QueueSizeB < 16)
                         {
-                            this.memory.FifoDma(2);
+                            _memory.FifoDma(2);
                         }
                     }
                 }
@@ -392,106 +374,106 @@ namespace GarboDev.Cores
                 // Overflow, attempt to fire IRQ
                 if ((control & (1 << 6)) != 0)
                 {
-                    this.RequestIrq(3 + timer);
+                    RequestIrq(3 + timer);
                 }
 
                 if (timer < 3)
                 {
-                    ushort control2 = Memory.ReadU16(this.memory.IORam, Memory.TM0CNT + (uint)((timer + 1) * 4));
+                    var control2 = Memory.ReadU16(_memory.IORam, Memory.TM0CNT + (uint)((timer + 1) * 4));
                     if ((control2 & (1 << 2)) != 0)
                     {
                         // Count-up
-                        this.UpdateTimer(timer + 1, (int)((timerCnt >> 16) << 10), true);
+                        UpdateTimer(timer + 1, (int)((timerCnt >> 16) << 10), true);
                     }
                 }
 
                 // Reset the original value
-                uint count = Memory.ReadU16(this.memory.IORam, Memory.TM0D + (uint)(timer * 4));
-                this.memory.TimerCnt[timer] = count << 10;
+                uint count = Memory.ReadU16(_memory.IORam, Memory.TM0D + (uint)(timer * 4));
+                _memory.TimerCnt[timer] = count << 10;
             }
         }
 
         public void UpdateTimers()
         {
-            int cycles = this.timerCycles - this.cycles;
+            var cycles = _timerCycles - Cycles;
 
-            for (int i = 0; i < 4; i++)
+            for (var i = 0; i < 4; i++)
             {
-                this.UpdateTimer(i, cycles, false);
+                UpdateTimer(i, cycles, false);
             }
 
-            this.timerCycles = this.cycles;
+            _timerCycles = Cycles;
         }
 
         public void UpdateKeyState()
         {
-            ushort KEYCNT = this.memory.ReadU16Debug(Memory.REG_BASE + Memory.KEYCNT);
+            var KEYCNT = _memory.ReadU16Debug(Memory.REG_BASE + Memory.KEYCNT);
 
             if ((KEYCNT & (1 << 14)) != 0)
             {
                 if ((KEYCNT & (1 << 15)) != 0)
                 {
                     KEYCNT &= 0x3FF;
-                    if (((~this.keyState) & KEYCNT) == KEYCNT)
-                        this.RequestIrq(12);
+                    if (((~_keyState) & KEYCNT) == KEYCNT)
+                        RequestIrq(12);
                 }
                 else
                 {
                     KEYCNT &= 0x3FF;
-                    if (((~this.keyState) & KEYCNT) != 0)
-                        this.RequestIrq(12);
+                    if (((~_keyState) & KEYCNT) != 0)
+                        RequestIrq(12);
                 }
             }
 
-            this.memory.KeyState = this.keyState;
+            _memory.KeyState = _keyState;
         }
 
         public void UpdateSound()
         {
-            this.sound.Mix(this.soundCycles);
-            this.soundCycles = 0;
+            _sound.Mix(_soundCycles);
+            _soundCycles = 0;
         }
 
         public void Execute(int cycles)
         {
-            this.cycles += cycles;
-            this.timerCycles += cycles;
-            this.soundCycles += cycles;
-            this.BreakpointHit = false;
+            Cycles += cycles;
+            _timerCycles += cycles;
+            _soundCycles += cycles;
+            BreakpointHit = false;
 
-            if (this.cpuHalted)
+            if (_cpuHalted)
             {
-                ushort ie = Memory.ReadU16(this.memory.IORam, Memory.IE);
-                ushort iflag = Memory.ReadU16(this.memory.IORam, Memory.IF);
+                var ie = Memory.ReadU16(_memory.IORam, Memory.IE);
+                var iflag = Memory.ReadU16(_memory.IORam, Memory.IF);
 
                 if ((ie & iflag) != 0)
                 {
-                    this.cpuHalted = false;
+                    _cpuHalted = false;
                 }
                 else
                 {
-                    this.cycles = 0;
-                    this.UpdateTimers();
-                    this.UpdateSound();
+                    Cycles = 0;
+                    UpdateTimers();
+                    UpdateSound();
                     return;
                 }
             }
 
-            while (this.cycles > 0)
+            while (Cycles > 0)
             {
-                if ((this.cpsr & Arm7Processor.T_MASK) == Arm7Processor.T_MASK)
+                if ((CPSR & T_MASK) == T_MASK)
                 {
-                    this.thumbCore.Execute();
+                    _thumbCore.Execute();
                 }
                 else
                 {
-                    this.armCore.Execute();
+                    _armCore.Execute();
                 }
 
-                this.UpdateTimers();
-                this.UpdateSound();
+                UpdateTimers();
+                UpdateSound();
 
-                if (this.BreakpointHit)
+                if (BreakpointHit)
                 {
                     break;
                 }

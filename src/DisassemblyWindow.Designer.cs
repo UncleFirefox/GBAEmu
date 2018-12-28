@@ -1,6 +1,6 @@
 ﻿namespace GarboDev.WinForms
 {
-    partial class DissassemblyWindow
+    partial class DisassemblyWindow
     {
         /// <summary>
         /// Required designer variable.
@@ -210,7 +210,7 @@
             this.displayAutoRadio.Text = "Auto";
             this.displayAutoRadio.CheckedChanged += new System.EventHandler(this.displayAutoRadio_CheckedChanged);
             // 
-            // DissassemblyWindow
+            // DisassemblyWindow
             // 
             this.ClientSize = new System.Drawing.Size(630, 533);
             this.Controls.Add(this.displayAutoRadio);
@@ -226,8 +226,8 @@
             this.Controls.Add(this.step);
             this.Controls.Add(this.RegistersGroup);
             this.Controls.Add(this.disassembly);
-            this.Name = "DissassemblyWindow";
-            this.Text = "DissassemblyWindow";
+            this.Name = "DisassemblyWindow";
+            this.Text = "DisassemblyWindow";
             this.RegistersGroup.ResumeLayout(false);
             this.RegistersGroup.PerformLayout();
             this.ResumeLayout(false);

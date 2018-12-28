@@ -11,26 +11,23 @@ namespace GarboDev.Cores.DynamicCore
             public int Position = -1;
         }
 
-        private List<byte> data = new List<byte>(60);
-        private List<Label> labels = new List<Label>();
+        private readonly List<byte> _data = new List<byte>(60);
+        private readonly List<Label> _labels = new List<Label>();
 
-        public List<byte> Data
-        {
-            get { return this.data; }
-        }
+        public List<byte> Data => _data;
 
         public void AddUint(uint argument)
         {
-            this.data.Add((byte)(argument & 0xff));
-            this.data.Add((byte)((argument >> 8) & 0xff));
-            this.data.Add((byte)((argument >> 16) & 0xff));
-            this.data.Add((byte)((argument >> 24) & 0xff));
+            _data.Add((byte)(argument & 0xff));
+            _data.Add((byte)((argument >> 8) & 0xff));
+            _data.Add((byte)((argument >> 16) & 0xff));
+            _data.Add((byte)((argument >> 24) & 0xff));
         }
 
         public Label DefineLabel()
         {
-            Label tmp = new Label();
-            this.labels.Add(tmp);
+            var tmp = new Label();
+            _labels.Add(tmp);
             return tmp;
         }
 
@@ -41,121 +38,121 @@ namespace GarboDev.Cores.DynamicCore
                 throw new Exception("Can't change label position after defined");
             }
 
-            label.Position = this.data.Count;
+            label.Position = _data.Count;
 
-            foreach (int parent in label.Parents)
+            foreach (var parent in label.Parents)
             {
-                this.data[parent] = (byte)(label.Position & 0xff);
-                this.data[parent + 1] = (byte)((label.Position >> 8) & 0xff);
-                this.data[parent + 2] = (byte)((label.Position >> 16) & 0xff);
-                this.data[parent + 3] = (byte)((label.Position >> 24) & 0xff);
+                _data[parent] = (byte)(label.Position & 0xff);
+                _data[parent + 1] = (byte)((label.Position >> 8) & 0xff);
+                _data[parent + 2] = (byte)((label.Position >> 16) & 0xff);
+                _data[parent + 3] = (byte)((label.Position >> 24) & 0xff);
             }
         }
 
         public void Emit(Armlet armlet)
         {
-            this.data.Add(armlet.Opcode);
-            this.data.Add(armlet.Flags);
-            this.data.Add(armlet.Size);
+            _data.Add(armlet.Opcode);
+            _data.Add(armlet.Flags);
+            _data.Add(armlet.Size);
         }
 
         public void Emit(Armlet armlet, Armlet.FlagDefinitions flags)
         {
-            this.data.Add(armlet.Opcode);
-            this.data.Add((byte)flags);
-            this.data.Add(armlet.Size);
+            _data.Add(armlet.Opcode);
+            _data.Add((byte)flags);
+            _data.Add(armlet.Size);
         }
 
         public void Emit(Armlet armlet, uint argument)
         {
-            this.data.Add(armlet.Opcode);
-            this.data.Add(armlet.Flags);
-            this.AddUint(argument);
-            this.data.Add(armlet.Size);
+            _data.Add(armlet.Opcode);
+            _data.Add(armlet.Flags);
+            AddUint(argument);
+            _data.Add(armlet.Size);
         }
 
         public void Emit(Armlet armlet, Armlet.FlagDefinitions flags, uint argument)
         {
-            this.data.Add(armlet.Opcode);
-            this.data.Add((byte)flags);
-            this.AddUint(argument);
-            this.data.Add(armlet.Size);
+            _data.Add(armlet.Opcode);
+            _data.Add((byte)flags);
+            AddUint(argument);
+            _data.Add(armlet.Size);
         }
 
         public void Emit(Armlet armlet, byte argument)
         {
-            this.data.Add(armlet.Opcode);
-            this.data.Add(armlet.Flags);
-            this.data.Add(argument);
-            this.data.Add(armlet.Size);
+            _data.Add(armlet.Opcode);
+            _data.Add(armlet.Flags);
+            _data.Add(argument);
+            _data.Add(armlet.Size);
         }
 
         public void Emit(Armlet armlet, Armlet.FlagDefinitions flags, byte argument)
         {
-            this.data.Add(armlet.Opcode);
-            this.data.Add((byte)flags);
-            this.data.Add(argument);
-            this.data.Add(armlet.Size);
+            _data.Add(armlet.Opcode);
+            _data.Add((byte)flags);
+            _data.Add(argument);
+            _data.Add(armlet.Size);
         }
 
         public void Emit(Armlet armlet, byte argument1, byte argument2)
         {
-            this.data.Add(armlet.Opcode);
-            this.data.Add(armlet.Flags);
-            this.data.Add(argument1);
-            this.data.Add(argument2);
-            this.data.Add(armlet.Size);
+            _data.Add(armlet.Opcode);
+            _data.Add(armlet.Flags);
+            _data.Add(argument1);
+            _data.Add(argument2);
+            _data.Add(armlet.Size);
         }
 
         public void Emit(Armlet armlet, Armlet.FlagDefinitions flags, byte argument1, byte argument2)
         {
-            this.data.Add(armlet.Opcode);
-            this.data.Add((byte)flags);
-            this.data.Add(argument1);
-            this.data.Add(argument2);
-            this.data.Add(armlet.Size);
+            _data.Add(armlet.Opcode);
+            _data.Add((byte)flags);
+            _data.Add(argument1);
+            _data.Add(argument2);
+            _data.Add(armlet.Size);
         }
 
         public void Emit(Armlet armlet, byte argument1, byte argument2, byte argument3)
         {
-            this.data.Add(armlet.Opcode);
-            this.data.Add(armlet.Flags);
-            this.data.Add(argument1);
-            this.data.Add(argument2);
-            this.data.Add(argument3);
-            this.data.Add(armlet.Size);
+            _data.Add(armlet.Opcode);
+            _data.Add(armlet.Flags);
+            _data.Add(argument1);
+            _data.Add(argument2);
+            _data.Add(argument3);
+            _data.Add(armlet.Size);
         }
 
         public void Emit(Armlet armlet, Armlet.FlagDefinitions flags, byte argument1, byte argument2, byte argument3)
         {
-            this.data.Add(armlet.Opcode);
-            this.data.Add((byte)flags);
-            this.data.Add(argument1);
-            this.data.Add(argument2);
-            this.data.Add(argument3);
-            this.data.Add(armlet.Size);
+            _data.Add(armlet.Opcode);
+            _data.Add((byte)flags);
+            _data.Add(argument1);
+            _data.Add(argument2);
+            _data.Add(argument3);
+            _data.Add(armlet.Size);
         }
 
         public void Emit(Armlet armlet, Label label)
         {
-            this.data.Add(armlet.Opcode);
-            this.data.Add(armlet.Flags);
+            _data.Add(armlet.Opcode);
+            _data.Add(armlet.Flags);
 
-            label.Parents.Add(this.data.Count);
-            this.AddUint((uint)label.Position);
+            label.Parents.Add(_data.Count);
+            AddUint((uint)label.Position);
 
-            this.data.Add(armlet.Size);
+            _data.Add(armlet.Size);
         }
 
         public void Emit(Armlet armlet, Armlet.FlagDefinitions flags, Label label)
         {
-            this.data.Add(armlet.Opcode);
-            this.data.Add((byte)flags);
+            _data.Add(armlet.Opcode);
+            _data.Add((byte)flags);
 
-            label.Parents.Add(this.data.Count);
-            this.AddUint((uint)label.Position);
+            label.Parents.Add(_data.Count);
+            AddUint((uint)label.Position);
 
-            this.data.Add(armlet.Size);
+            _data.Add(armlet.Size);
         }
     }
 }

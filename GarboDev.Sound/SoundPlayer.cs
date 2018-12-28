@@ -9,122 +9,126 @@ namespace GarboDev.Sound
 
     public class SoundPlayer : IDisposable
     {
-        private Device soundDevice;
-        private SecondaryBuffer soundBuffer;
-        private int samplesPerUpdate;
-        private AutoResetEvent[] fillEvent = new AutoResetEvent[2];
-        private Thread thread;
-        private PullAudio pullAudio;
-        private short channels;
-        private bool halted;
-        private bool running;
+        private Device _soundDevice;
+        private SecondaryBuffer _soundBuffer;
+        private readonly int _samplesPerUpdate;
+        private readonly AutoResetEvent[] _fillEvent = new AutoResetEvent[2];
+        private readonly Thread _thread;
+        private readonly PullAudio _pullAudio;
+        private readonly short _channels;
+        private bool _halted;
+        private bool _running;
 
         public SoundPlayer(Control owner, PullAudio pullAudio, short channels)
         {
-            this.channels = channels;
-            this.pullAudio = pullAudio;
+            _channels = channels;
+            _pullAudio = pullAudio;
 
-            this.soundDevice = new Device();
-            this.soundDevice.SetCooperativeLevel(owner, CooperativeLevel.Priority);
+            _soundDevice = new Device();
+            _soundDevice.SetCooperativeLevel(owner, CooperativeLevel.Priority);
 
             // Set up our wave format to 44,100Hz, with 16 bit resolution
-            WaveFormat wf = new WaveFormat();
-            wf.FormatTag = WaveFormatTag.Pcm;
-            wf.SamplesPerSecond = 44100;
-            wf.BitsPerSample = 16;
-            wf.Channels = channels;
+            var wf = new WaveFormat
+            {
+                FormatTag = WaveFormatTag.Pcm, SamplesPerSecond = 44100, BitsPerSample = 16, Channels = channels
+            };
             wf.BlockAlign = (short)(wf.Channels * wf.BitsPerSample / 8);
             wf.AverageBytesPerSecond = wf.SamplesPerSecond * wf.BlockAlign;
 
-            this.samplesPerUpdate = 512;
+            _samplesPerUpdate = 512;
 
             // Create a buffer with 2 seconds of sample data
-            BufferDescription bufferDesc = new BufferDescription(wf);
-            bufferDesc.BufferBytes = this.samplesPerUpdate * wf.BlockAlign * 2;
-            bufferDesc.ControlPositionNotify = true;
-            bufferDesc.GlobalFocus = true;
+            var bufferDesc = new BufferDescription(wf)
+            {
+                BufferBytes = _samplesPerUpdate * wf.BlockAlign * 2,
+                ControlPositionNotify = true,
+                GlobalFocus = true
+            };
 
-            this.soundBuffer = new SecondaryBuffer(bufferDesc, this.soundDevice);
+            _soundBuffer = new SecondaryBuffer(bufferDesc, _soundDevice);
 
-            Notify notify = new Notify(this.soundBuffer);
+            var notify = new Notify(_soundBuffer);
 
-            fillEvent[0] = new AutoResetEvent(false);
-            fillEvent[1] = new AutoResetEvent(false);
+            _fillEvent[0] = new AutoResetEvent(false);
+            _fillEvent[1] = new AutoResetEvent(false);
 
             // Set up two notification events, one at halfway, and one at the end of the buffer
-            BufferPositionNotify[] posNotify = new BufferPositionNotify[2];
-            posNotify[0] = new BufferPositionNotify();
-            posNotify[0].Offset = bufferDesc.BufferBytes / 2 - 1;
-            posNotify[0].EventNotifyHandle = fillEvent[0].SafeWaitHandle.DangerousGetHandle();
-            posNotify[1] = new BufferPositionNotify();
-            posNotify[1].Offset = bufferDesc.BufferBytes - 1;
-            posNotify[1].EventNotifyHandle = fillEvent[1].SafeWaitHandle.DangerousGetHandle();
+            var posNotify = new BufferPositionNotify[2];
+            posNotify[0] = new BufferPositionNotify
+            {
+                Offset = bufferDesc.BufferBytes / 2 - 1,
+                EventNotifyHandle = _fillEvent[0].SafeWaitHandle.DangerousGetHandle()
+            };
+            posNotify[1] = new BufferPositionNotify
+            {
+                Offset = bufferDesc.BufferBytes - 1,
+                EventNotifyHandle = _fillEvent[1].SafeWaitHandle.DangerousGetHandle()
+            };
 
             notify.SetNotificationPositions(posNotify);
 
-            this.thread = new Thread(new ThreadStart(SoundPlayback));
-            this.thread.Priority = ThreadPriority.Highest;
+            _thread = new Thread(SoundPlayback) {Priority = ThreadPriority.Highest};
 
-            this.Pause();
-            this.running = true;
+            Pause();
+            _running = true;
 
-            this.thread.Start();
+            _thread.Start();
         }
 
         public void Pause()
         {
-            if (this.halted) return;
+            if (_halted) return;
 
-            this.halted = true;
-            this.soundBuffer.Stop();
+            _halted = true;
+            _soundBuffer.Stop();
 
-            Monitor.Enter(this.thread);
+            Monitor.Enter(_thread);
         }
 
         public void Resume()
         {
-            if (!this.halted) return;
+            if (!_halted) return;
 
-            this.halted = false;
-            this.soundBuffer.Play(0, BufferPlayFlags.Looping);
+            _halted = false;
+            _soundBuffer.Play(0, BufferPlayFlags.Looping);
 
-            Monitor.Pulse(this.thread);
-            Monitor.Exit(this.thread);
+            Monitor.Pulse(_thread);
+            Monitor.Exit(_thread);
         }
 
         private void SoundPlayback()
         {
-            lock (this.thread)
+            lock (_thread)
             {
-                if (!this.running) return;
+                if (!_running) return;
 
                 // Set up the initial sound buffer to be the full length
-                int bufferLength = this.samplesPerUpdate * 2 * this.channels;
-                short[] soundData = new short[bufferLength];
+                var bufferLength = _samplesPerUpdate * 2 * _channels;
+                var soundData = new short[bufferLength];
 
                 // Prime it with the first x seconds of data
-                this.pullAudio(soundData, soundData.Length);
-                this.soundBuffer.Write(0, soundData, LockFlag.None);
+                _pullAudio(soundData, soundData.Length);
+                _soundBuffer.Write(0, soundData, LockFlag.None);
 
                 // Start it playing
-                this.soundBuffer.Play(0, BufferPlayFlags.Looping);
+                _soundBuffer.Play(0, BufferPlayFlags.Looping);
 
-                int lastWritten = 0;
-                while (this.running)
+                var lastWritten = 0;
+                while (_running)
                 {
-                    if (this.halted)
+                    if (_halted)
                     {
-                        Monitor.Pulse(this.thread);
-                        Monitor.Wait(this.thread);
+                        Monitor.Pulse(_thread);
+                        Monitor.Wait(_thread);
                     }
 
                     // Wait on one of the notification events with a 3ms timeout
-                    WaitHandle.WaitAny(this.fillEvent, 3, true);
+                    WaitHandle.WaitAny(_fillEvent, 3, true);
 
                     // Get the current play position (divide by two because we are using 16 bit samples)
-                    if (this.soundBuffer != null)
+                    if (_soundBuffer != null)
                     {
-                        int tmp = this.soundBuffer.PlayPosition / 2;
+                        var tmp = _soundBuffer.PlayPosition / 2;
 
                         // Generate new sounds from lastWritten to tmp in the sound buffer
                         if (tmp == lastWritten)
@@ -136,10 +140,10 @@ namespace GarboDev.Sound
                             soundData = new short[(tmp - lastWritten + bufferLength) % bufferLength];
                         }
 
-                        this.pullAudio(soundData, soundData.Length);
+                        _pullAudio(soundData, soundData.Length);
 
                         // Write in the generated data
-                        soundBuffer.Write(lastWritten * 2, soundData, LockFlag.None);
+                        _soundBuffer.Write(lastWritten * 2, soundData, LockFlag.None);
 
                         // Save the position we were at
                         lastWritten = tmp;
@@ -150,18 +154,18 @@ namespace GarboDev.Sound
 
         public void Dispose()
         {
-            this.running = false;
-            this.Resume();
+            _running = false;
+            Resume();
 
-            if (this.soundBuffer != null)
+            if (_soundBuffer != null)
             {
-                this.soundBuffer.Dispose();
-                this.soundBuffer = null;
+                _soundBuffer.Dispose();
+                _soundBuffer = null;
             }
-            if (this.soundDevice != null)
+            if (_soundDevice != null)
             {
-                this.soundDevice.Dispose();
-                this.soundDevice = null;
+                _soundDevice.Dispose();
+                _soundDevice = null;
             }
         }
     }

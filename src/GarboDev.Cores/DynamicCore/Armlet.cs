@@ -15,22 +15,16 @@ namespace GarboDev.Cores.DynamicCore
         public byte Flags;
         public byte Size;
         
-        public byte InFlags
-        {
-            get { return (byte)(this.Flags >> 4); }
-        }
+        public byte InFlags => (byte)(Flags >> 4);
 
-        public byte OutFlags
-        {
-            get { return (byte)(this.Flags & 0xF); }
-        }
+        public byte OutFlags => (byte)(Flags & 0xF);
 
         public Armlet(string name, ArmletOpcodes opcode, FlagDefinitions inFlags, FlagDefinitions outFlags, byte size)
         {
-            this.Name = name;
-            this.Opcode = (byte)opcode;
-            this.Flags = MakeFlag(inFlags, outFlags);
-            this.Size = size;
+            Name = name;
+            Opcode = (byte)opcode;
+            Flags = MakeFlag(inFlags, outFlags);
+            Size = size;
         }
 
         public static byte MakeFlag(FlagDefinitions inFlags, FlagDefinitions outFlags)

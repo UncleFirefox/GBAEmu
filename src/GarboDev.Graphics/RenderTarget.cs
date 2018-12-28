@@ -5,70 +5,54 @@ namespace GarboDev.Graphics
 {
     public class RenderTarget
     {
-        private Device device = null;
-        private int width;
-        private int height;
-        private Texture texture = null;
-        private Surface surface = null;
-        private RenderToSurface renderToSurface = null;
-        private Viewport viewport;
+        private readonly Device _device;
+        private Surface _surface;
+        private readonly RenderToSurface _renderToSurface;
+        private readonly Viewport _viewport;
 
-        public int Width
-        {
-            get { return this.width; }
-        }
+        public int Width { get; }
 
-        public int Height
-        {
-            get { return this.height; }
-        }
+        public int Height { get; }
 
-        public Texture Texture
-        {
-            get { return this.texture; }
-        }
+        public Texture Texture { get; private set; }
 
         public RenderTarget(int width, int height, Device device)
         {
-            this.device = device;
-            this.width = width;
-            this.height = height;
+            _device = device;
+            Width = width;
+            Height = height;
 
-            viewport = new Viewport();
-            viewport.X = 0;
-            viewport.Y = 0;
-            viewport.Width = width;
-            viewport.Height = height;
+            _viewport = new Viewport {X = 0, Y = 0, Width = width, Height = height};
 
-            this.InitializeRenderTarget();
+            InitializeRenderTarget();
 
-            this.renderToSurface = new RenderToSurface(device, surface.Description.Width, surface.Description.Height,
-                surface.Description.Format, true, DepthFormat.D24S8);
+            _renderToSurface = new RenderToSurface(device, _surface.Description.Width, _surface.Description.Height,
+                _surface.Description.Format, true, DepthFormat.D24S8);
 
-            this.renderToSurface.Reset += new EventHandler(OnRenderToSurfaceReset);
+            _renderToSurface.Reset += OnRenderToSurfaceReset;
         }
 
         private void InitializeRenderTarget()
         {
-            this.texture = new Texture(device, width, height, 1, Usage.RenderTarget,
+            Texture = new Texture(_device, Width, Height, 1, Usage.RenderTarget,
                 Format.X8R8G8B8, Pool.Default);
 
-            this.surface = texture.GetSurfaceLevel(0);
+            _surface = Texture.GetSurfaceLevel(0);
         }
 
         private void OnRenderToSurfaceReset(object sender, EventArgs e)
         {
-            this.InitializeRenderTarget();
+            InitializeRenderTarget();
         }
 
         public void BeginScene()
         {
-            this.renderToSurface.BeginScene(this.surface, this.viewport);
+            _renderToSurface.BeginScene(_surface, _viewport);
         }
 
         public void EndScene()
         {
-            this.renderToSurface.EndScene(Filter.None);
+            _renderToSurface.EndScene(Filter.None);
         }
     }
 }

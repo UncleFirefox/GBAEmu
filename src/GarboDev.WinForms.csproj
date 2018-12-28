@@ -83,11 +83,11 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="DissassemblyWindow.cs">
+    <Compile Include="DisassemblyWindow.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="DissassemblyWindow.Designer.cs">
-      <DependentUpon>DissassemblyWindow.cs</DependentUpon>
+    <Compile Include="DisassemblyWindow.Designer.cs">
+      <DependentUpon>DisassemblyWindow.cs</DependentUpon>
     </Compile>
     <Compile Include="MainWindow.cs">
       <SubType>Form</SubType>
@@ -102,10 +102,6 @@
       <DependentUpon>PaletteWindow.cs</DependentUpon>
     </Compile>
     <Compile Include="Program.cs" />
-    <EmbeddedResource Include="DissassemblyWindow.resx">
-      <DependentUpon>DissassemblyWindow.cs</DependentUpon>
-      <SubType>Designer</SubType>
-    </EmbeddedResource>
     <EmbeddedResource Include="MainWindow.resx">
       <DependentUpon>MainWindow.cs</DependentUpon>
       <SubType>Designer</SubType>
