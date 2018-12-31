@@ -45,10 +45,6 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\GarboDev.Sound\GarboDev.Sound.csproj">
-      <Project>{0325E364-0A97-4EBF-BC00-2E0C87F15D5B}</Project>
-      <Name>GarboDev.Sound</Name>
-    </ProjectReference>
     <ProjectReference Include="..\GarboDev.Cores\GarboDev.Cores.csproj">
       <Project>{879B867F-5C20-4C6A-A444-8D932C042B1D}</Project>
       <Name>GarboDev.Cores</Name>
@@ -56,6 +52,10 @@
     <ProjectReference Include="..\GarboDev.Graphics\GarboDev.Graphics.csproj">
       <Project>{CB000730-64AD-4EE2-A621-310BBB55170E}</Project>
       <Name>GarboDev.Graphics</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\GarboDev.Sound\GarboDev.Sound.csproj">
+      <Project>{0325e364-0a97-4ebf-bc00-2e0c87f15d5b}</Project>
+      <Name>GarboDev.Sound</Name>
     </ProjectReference>
     <ProjectReference Include="..\GarboDev.System\GarboDev.CrossCutting.csproj">
       <Project>{2DAAF81B-0402-4F92-BCF3-A9B5BC7431F8}</Project>

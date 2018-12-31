@@ -119,9 +119,6 @@
     <AppDesigner Include="Properties\" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="readme.txt" />
-  </ItemGroup>
-  <ItemGroup>
     <BootstrapperFile Include="Microsoft.Net.Framework.2.0">
       <InProject>False</InProject>
       <ProductName>.NET Framework 2.0</ProductName>
@@ -140,19 +137,19 @@
       <Project>{0325E364-0A97-4EBF-BC00-2E0C87F15D5B}</Project>
       <Name>GarboDev.Sound</Name>
     </ProjectReference>
-    <ProjectReference Include="GarboDev.Cores\GarboDev.Cores.csproj">
+    <ProjectReference Include="..\GarboDev.Cores\GarboDev.Cores.csproj">
       <Project>{879B867F-5C20-4C6A-A444-8D932C042B1D}</Project>
       <Name>GarboDev.Cores</Name>
     </ProjectReference>
-    <ProjectReference Include="GarboDev.GbaManager\GarboDev.GbaManager.csproj">
+    <ProjectReference Include="..\GarboDev.GbaManager\GarboDev.GbaManager.csproj">
       <Project>{9CDA06CA-2B29-4B3B-BEBD-40D580F8C5D7}</Project>
       <Name>GarboDev.GbaManager</Name>
     </ProjectReference>
-    <ProjectReference Include="GarboDev.Graphics\GarboDev.Graphics.csproj">
+    <ProjectReference Include="..\GarboDev.Graphics\GarboDev.Graphics.csproj">
       <Project>{CB000730-64AD-4EE2-A621-310BBB55170E}</Project>
       <Name>GarboDev.Graphics</Name>
     </ProjectReference>
-    <ProjectReference Include="GarboDev.System\GarboDev.CrossCutting.csproj">
+    <ProjectReference Include="..\GarboDev.System\GarboDev.CrossCutting.csproj">
       <Project>{2DAAF81B-0402-4F92-BCF3-A9B5BC7431F8}</Project>
       <Name>GarboDev.CrossCutting</Name>
     </ProjectReference>

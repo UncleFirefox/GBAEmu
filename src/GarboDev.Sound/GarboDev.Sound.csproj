@@ -48,7 +48,7 @@
     <Compile Include="SoundPlayer.cs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\src\GarboDev.System\GarboDev.CrossCutting.csproj">
+    <ProjectReference Include="..\GarboDev.System\GarboDev.CrossCutting.csproj">
       <Project>{2DAAF81B-0402-4F92-BCF3-A9B5BC7431F8}</Project>
       <Name>GarboDev.CrossCutting</Name>
     </ProjectReference>

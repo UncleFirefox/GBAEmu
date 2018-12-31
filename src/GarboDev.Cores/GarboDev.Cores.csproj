@@ -55,8 +55,8 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\GarboDev.Sound\GarboDev.Sound.csproj">
-      <Project>{0325E364-0A97-4EBF-BC00-2E0C87F15D5B}</Project>
+    <ProjectReference Include="..\GarboDev.Sound\GarboDev.Sound.csproj">
+      <Project>{0325e364-0a97-4ebf-bc00-2e0c87f15d5b}</Project>
       <Name>GarboDev.Sound</Name>
     </ProjectReference>
     <ProjectReference Include="..\GarboDev.System\GarboDev.CrossCutting.csproj">
