@@ -1,5 +1,5 @@
 # GBAEmu
-GBA Emuator Port to modern .NET (or at least an attempt)
+GBA Emulator Port to modern .NET (or at least an attempt)
 
 Original idea was from developer Gladius:
 http://www.emutalk.net/archive/index.php/t-33935.html
